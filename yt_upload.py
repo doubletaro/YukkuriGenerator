@@ -9,17 +9,31 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, r"C:\wk\StockSeeker")
-sys.path.insert(0, r"C:\wk\StockSeeker\backend")
+PROJECT = Path(__file__).resolve().parent
+
+# 外部アップローダ(StockSeeker)を優先して path 追加(env YUKKURI_STOCKSEEKER で上書き可)
+_stockseeker = os.environ.get("YUKKURI_STOCKSEEKER", r"C:\wk\StockSeeker")
+if Path(_stockseeker).exists():
+    sys.path.insert(0, _stockseeker)
+    sys.path.insert(0, str(Path(_stockseeker) / "backend"))
 
 from backend.video_generator.youtube_uploader import YouTubeUploader  # noqa: E402
 
-PROJECT = Path(__file__).resolve().parent
-SECRETS = r"C:\wk\StockSeeker\backend\video_generator\assets\client_secrets.json"
-TOKEN = str(PROJECT / "assets" / "token_aifolktale.json")
+# client_secrets: env > repo同梱 > StockSeeker 同梱 の順に解決(実ファイルはリポジトリ外)
+SECRETS = os.environ.get("YUKKURI_CLIENT_SECRETS", "")
+if not SECRETS:
+    for _cand in (
+        str(PROJECT / "assets" / "client_secrets.json"),
+        r"C:\wk\StockSeeker\backend\video_generator\assets\client_secrets.json",
+    ):
+        if Path(_cand).exists():
+            SECRETS = _cand
+            break
+TOKEN = os.environ.get("YUKKURI_TOKEN_FILE", str(PROJECT / "assets" / "token_aifolktale.json"))
 
 CHANNEL_ID = "UCTCodKUZ2XEJ2GkFdY-tXQQ"  # AI昔話
 
