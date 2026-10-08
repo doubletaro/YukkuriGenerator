@@ -6,7 +6,7 @@
 テーマ → [script] LLM台本生成(GLM/DGX01)
        → [tts]    VOICEVOX 音声合成 + 音素タイムライン
        → [render] 口パクフレーム + ASS字幕 + BGM → ffmpeg (NVENC/ libx264)
-       → [publish]ローカル保存 / Telegram送信
+       → [publish]ローカル保存
 ```
 
 ## 使い方
@@ -35,8 +35,3 @@
 | VOICEVOX engine | `%LOCALAPPDATA%/Programs/VOICEVOX/vv-engine/run.exe` | 未起動なら自動起動 |
 | ffmpeg | PATH or winget | subtitles/ass/amix 必須 |
 | LLM | OpenAI互換 API(`config/render.yaml` の llm) | DGX01 tensorfold GLM |
-
-## Telegram 自動報告
-
-環境変数 `YUKKURI_TG_TOKEN` `YUKKURI_TG_CHAT_ID` があるときのみ sendVideo する。
-無設定では Local のみ。cron から呼ぶときに設定する。
