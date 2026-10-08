@@ -1,0 +1,87 @@
+{
+ "urashima": {
+  "title": "浦島太郎",
+  "characters": {
+   "urashima": {
+    "name": "浦島太郎",
+    "desc": "若く誠実な漁師の青年、藍色の漁師着、釣り竿と網を持つ。",
+    "voice_style": 3
+   },
+   "turtle": {
+    "name": "亀",
+    "desc": "金色に光る大きな甲羅の海亀、優しい目。",
+    "voice_style": 3
+   },
+   "otohime": {
+    "name": "乙姫さま",
+    "desc": "豪華な十二単の美しい姫、黒髪引き上げ髪。",
+    "voice_style": 2
+   },
+   "maid": {
+    "name": "竜宮の侍女",
+    "desc": "華やかな舞踏着の美しい侍女たち、扇を持つ。",
+    "voice_style": 0
+   }
+  }
+ },
+ "issun": {
+  "title": "一寸法師",
+  "characters": {
+   "issun": {
+    "name": "一寸法師",
+    "desc": "一寸法師。親指ほどの小さな少年、藍色の小さな着物、針の刀を腰に差す。元気で勇ましい表情。",
+    "voice_style": 3
+   },
+   "old_man": {
+    "name": "おじいさん",
+    "desc": "一寸法師の父。白髭を生やした優しそうな老人、灰色の着物。",
+    "voice_style": 2
+   },
+   "old_woman": {
+    "name": "おばあさん",
+    "desc": "一寸法師の母。白髪を結った優しそうな老婦人、薄茶の着物。",
+    "voice_style": 2
+   },
+   "oni": {
+    "name": "鬼",
+    "desc": "一寸法師を飲み込もうとした巨人の鬼。赤い肌、角二本、虎柄のふんどし、大きな金棒。",
+    "voice_style": 7
+   },
+   "princess": {
+    "name": "お姫さま",
+    "desc": "高貴な姫。黒髪お姫さまカット、華やかな打ち掛け。",
+    "voice_style": 0
+   }
+  }
+ },
+ "kaguya": {
+  "title": "かぐや姫",
+  "characters": {
+   "kaguya": {
+    "name": "かぐや姫",
+    "desc": "かぐや姫。月光の輝きを放つ長い黒髪、白い十二単の美しい姫、静かで儚い表情。",
+    "voice_style": 2
+   },
+   "bamboo_old_man": {
+    "name": "竹取の翁",
+    "desc": "かぐや姫の養父。白髭の老人、竹刈りの道具を持つ古びた着物。",
+    "voice_style": 2
+   },
+   "bamboo_old_woman": {
+    "name": "竹取の媼",
+    "desc": "かぐや姫の養母。優しい老婦人、淡色の着物。",
+    "voice_style": 0
+   },
+   "mikado": {
+    "name": "帝",
+    "desc": "帝(みかど)。冠と深い紫色の装束の威厳ある男性。",
+    "voice_style": 2
+   },
+   "moon_envoy": {
+    "name": "月の使者",
+    "desc": "月からの使者。光る天衣を纏い、雲に乗る男女の天人たち。",
+    "voice_style": 4
+   }
+  }
+ }
+}

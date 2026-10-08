@@ -1,0 +1,27 @@
+[project]
+name = "yukkuri-generator"
+version = "0.1.0"
+description = "Autonomous yukkuri-dialogue video generator: theme -> LLM script -> VOICEVOX TTS -> ffmpeg render -> publish"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "requests>=2.31",
+    "Pillow>=10.0",
+    "psd-tools>=1.10",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+yukkuri = "yukkuri.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["yukkuri*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

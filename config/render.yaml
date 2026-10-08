@@ -1,0 +1,49 @@
+# 描画・同期変数。チューニングはコードを触らずここを編集する。
+resolution: [1920, 1080]
+fps: 30
+avatar_height_ratio: 0.85   # キャラ立ち絵の高さ/画面高
+left_flip: true             # config/characters.yaml の flip が優先(互換用)
+line_gap_sec: 0.45          # セリフ間の無音
+title_duration_sec: 2.5     # 冒頭タイトルカード
+min_frame_sec: 0.08         # 口パク1フレームの最小秒数(細かすぎ防止)
+background: assets/background.jpg
+
+tts:
+  host: 127.0.0.1
+  port: 50021
+  speed_scale: 1.1          # セリフ速度(VOICEVOX speedScale)
+
+llm:
+  base_url: http://192.168.1.21:8888/v1
+  model: GLM-5.3-Flash-EXL3
+  api_key: none
+  temperature: 0.8
+  target_lines: 14          # 1〜3分目安の台本行数
+  max_line_chars: 90
+  timeout_sec: 240
+  retries: 2
+  max_tokens: 8000
+
+subtitle:
+  font: Meiryo
+  font_size: 44
+  margin_v: 40              # 下端からのマージン
+  outline: 3
+
+bgm:
+  enabled: true
+  path: assets/bgm.mp3
+  volume: 0.08
+
+lipsync:
+  phoneme_scale: 1.0   # 口パクが徐々に遅れる/進む場合の微調整係数(遅れる<1)。StockSeekerで確立した aresample async 吸収と併用
+
+endcard:
+  duration_sec: 3.0
+  title_text: ご視聴ありがとうございました
+  sub_text: YukkuriGenerator
+
+encoder:
+  prefer: h264_nvenc        # NVENC検出して失敗なら fallback
+  fallback: libx264
+  crf: 20

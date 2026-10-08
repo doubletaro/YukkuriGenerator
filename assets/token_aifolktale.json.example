@@ -1,0 +1,12 @@
+{
+ "token": "<GENERATED_ON_FIRST_RUN>",
+ "refresh_token": "<YOUR_REFRESH_TOKEN>",
+ "token_uri": "<GENERATED_ON_FIRST_RUN>",
+ "client_id": "<GENERATED_ON_FIRST_RUN>",
+ "client_secret": "<GENERATED_ON_FIRST_RUN>",
+ "scopes": "<GENERATED_ON_FIRST_RUN>",
+ "universe_domain": "<GENERATED_ON_FIRST_RUN>",
+ "account": "<GENERATED_ON_FIRST_RUN>",
+ "expiry": "<GENERATED_ON_FIRST_RUN>",
+ "_comment": "Copy to token_aifolktale.json. Run the OAuth flow (yt_upload.py) to generate real values."
+}

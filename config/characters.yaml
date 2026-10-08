@@ -1,0 +1,53 @@
+# キャラクター定義。機能追加(キャラ追加)はここにエントリを足すだけ。
+characters:
+  shikoku_metan:
+    name: 四国めたん
+    speaker_id: 2          # VOICEVOX 四国めたん ノーマル
+    position: left
+    flip: true             # 左配置は反転して内側を向く
+    psd: metan.2.1.psd
+    accent_color: "#4169E1"
+    prompt: >-
+      あなたは「四国めたん」です。高等部2年・金欠・中二病趣味・タメ口・若干ツンデレ。
+      鋭く軽いツッコミを入れつつ、分かりやすく解説してください。
+    # レシピB: 感情→声スタイル(StockSeeker generate_video_task.py 由来+拡張)
+    voice_styles:
+      normal: 2          # ノーマル
+      happy: 0           # あまあま
+      excited: 0         # あまあま
+      surprised: 2       # ノーマル
+      think: 2           # ノーマル
+      angry: 6           # ツンツン
+      sad: 0             # あまあま
+      shy: 0             # あまあま
+      smug: 4            # セクシー
+      fail: 0            # あまあま
+      whisper: 36        # ささやき
+  zundamon:
+    name: ずんだもん
+    speaker_id: 3          # VOICEVOX ずんだもん ノーマル
+    position: right
+    flip: false
+    psd: zundamon.2.3.psd
+    accent_color: "#3CB371"
+    prompt: >-
+      あなたは「ずんだもん」です。語尾に「〜なのだ」「〜のだ」をつけて、
+      元気よく親しみやすい口調で話してください。専門用語は少しだけ噛み砕いてください。
+    voice_styles:
+      normal: 3          # ノーマル
+      happy: 1           # あまあま
+      excited: 1         # あまあま
+      surprised: 3       # ノーマル
+      think: 3           # ノーマル
+      angry: 7           # ツンツン
+      sad: 76            # なみだめ
+      shy: 1             # あまあま
+      smug: 5            # セクシー
+      fail: 76           # なみだめ
+      whisper: 38        # ささやき
+
+# 対話の基本ペア(左=解説役, 右=ボケ役 の想定)
+speaking_order: [shikoku_metan, zundamon]
+
+# 台本で使える感情(engines/avatar.py のプリセットと一致させる)
+emotions: [normal, happy, excited, surprised, think, angry, sad, shy, smug, fail, whisper]
