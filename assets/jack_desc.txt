@@ -1,0 +1,34 @@
+Jack and the Beanstalk|Japanese-style Folktale Anime|Classic Story in 3 Minutes
+
+Once upon a time, a poor boy named Jack traded his cow
+for a handful of magic beans.
+
+Overnight, a giant beanstalk grew up to the sky.
+Jack climbed it and found a giant's castle,
+where a hen laid golden eggs and a harp played by itself.
+
+He fled with the treasures, the giant chasing behind,
+chopped down the beanstalk, and the giant fell.
+Jack and his mother lived happily ever after.
+
+The End.
+
+About this channel:
+AI-generated folktale and classic story animations.
+Perfect for bedtime stories.
+
+Chapters:
+0:00 The cow and the magic beans
+0:30 The beanstalk and the castle
+1:00 The hen, the harp, and the giant
+1:30 The escape and the happy ending
+
+#JackAndTheBeanstalk #Folktale #AIAnime #BedtimeStories #AIStory
+
+━━━━━━━━━━━━━━━━━━
+Credits:
+- Video & audio: MiniMax H3 (ComfyUI / RTX 5060 Ti)
+- Character design: Qwen-Image
+- Script: GLM-5.3-Flash (local LLM)
+━━━━━━━━━━━━━━━━━━
+This video is AI-generated. Creative adaptations of the original tales are included.
