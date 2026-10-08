@@ -34,4 +34,4 @@
 |---|---|---|
 | VOICEVOX engine | `%LOCALAPPDATA%/Programs/VOICEVOX/vv-engine/run.exe` | 未起動なら自動起動 |
 | ffmpeg | PATH or winget | subtitles/ass/amix 必須 |
-| LLM | OpenAI互換 API(`config/render.yaml` の llm) | DGX01 tensorfold GLM |
+| LLM | OpenAI互換 API(`config/render.yaml` の llm) | ローカルLLM |
