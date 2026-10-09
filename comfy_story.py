@@ -30,7 +30,8 @@ def api_prompt(prompt_text: str, seed: int, prefix: str, first_frame: str | None
                ref_images: list[str] | None = None) -> dict:
     """first_frame: output 内の画像パス(相対) — 前シーン最終フレームからの続き生成に使用。
     ref_images: ComfyUI/input の画像リスト — キャラシート等の参照画像(R2V)。"""
-    node_class = "MiniMaxH3ReferenceToVideo" if ref_images else "MiniMaxH3ImageToVideo"
+    use_r2v = bool(ref_images) and not first_frame
+    node_class = "MiniMaxH3ReferenceToVideo" if use_r2v else "MiniMaxH3ImageToVideo"
     wf = {
         "1": {"class_type": "UNETLoader", "inputs": {"unet_name": UNET, "weight_dtype": "default"}},
         "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": CLIP, "type": "minimax", "device": "default"}},
