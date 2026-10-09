@@ -26,8 +26,11 @@ WIDTH, HEIGHT = 640, 480
 LENGTH = 362  # 17k+5 @24fps ≒ 15.08秒 (H3の学習上限)
 
 
-def api_prompt(prompt_text: str, seed: int, prefix: str, first_frame: str | None = None) -> dict:
-    """first_frame: output 内の画像パス(相対) — 前シーン最終フレームからの続き生成に使用。"""
+def api_prompt(prompt_text: str, seed: int, prefix: str, first_frame: str | None = None,
+               ref_images: list[str] | None = None) -> dict:
+    """first_frame: output 内の画像パス(相対) — 前シーン最終フレームからの続き生成に使用。
+    ref_images: ComfyUI/input の画像リスト — キャラシート等の参照画像(R2V)。"""
+    node_class = "MiniMaxH3ReferenceToVideo" if ref_images else "MiniMaxH3ImageToVideo"
     wf = {
         "1": {"class_type": "UNETLoader", "inputs": {"unet_name": UNET, "weight_dtype": "default"}},
         "2": {"class_type": "CLIPLoader", "inputs": {"clip_name": CLIP, "type": "minimax", "device": "default"}},
@@ -35,8 +38,8 @@ def api_prompt(prompt_text: str, seed: int, prefix: str, first_frame: str | None
         "4": {"class_type": "VAELoader", "inputs": {"vae_name": VAE_A}},
         "5": {"class_type": "LoraLoaderModelOnly", "inputs": {
             "lora_name": LORA, "strength_model": 1.0, "model": ["1", 0]}},
-        "6": {"class_type": "MiniMaxH3ImageToVideo", "inputs": {
-            "clip": ["2", 0], "vae": ["3", 0], "prompt": prompt_text,
+        "6": {"class_type": node_class, "inputs": {
+            "clip": ["2", 0], "vae": ["3", 0], "audio_vae": ["4", 0], "prompt": prompt_text,
             "width": WIDTH, "height": HEIGHT, "length": LENGTH}},
         "7": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed, "control_after_generate": "fixed"}},
         "8": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "res_multistep"}},
@@ -53,10 +56,20 @@ def api_prompt(prompt_text: str, seed: int, prefix: str, first_frame: str | None
         "15": {"class_type": "SaveVideo", "inputs": {
             "video": ["14", 0], "filename_prefix": f"momotaro/{prefix}", "format": "mp4"}},
     }
+    nid = 16
+    if ref_images:
+        # 参照画像(キャラシート)は最大3枚まで
+        pairs = {}
+        for i, img in enumerate(ref_images[:3]):
+            wf[str(nid)] = {"class_type": "LoadImage", "inputs": {"image": img}}
+            pairs[f"ref_images.ref_image_{i}"] = [str(nid), 0]
+            nid += 1
+        wf["6"]["inputs"].update(pairs)
+        wf["6"]["inputs"]["ref_image_size"] = "match"
     if first_frame:
         # LoadImage の入力は ComfyUI/input/ からの相対パス
-        wf["16"] = {"class_type": "LoadImage", "inputs": {"image": first_frame}}
-        wf["6"]["inputs"]["first_frame"] = ["16", 0]
+        wf[str(nid)] = {"class_type": "LoadImage", "inputs": {"image": first_frame}}
+        wf["6"]["inputs"]["first_frame"] = [str(nid), 0]
     return wf
 
 
@@ -106,8 +119,9 @@ def outputs_of(entry: dict) -> list[str]:
 
 
 def run_scene(prompt_text: str, seed: int, prefix: str, out_dir: Path,
-              first_frame: str | None = None) -> Path:
-    payload = {"prompt": api_prompt(prompt_text, seed, prefix, first_frame=first_frame),
+              first_frame: str | None = None, ref_images: list[str] | None = None) -> Path:
+    payload = {"prompt": api_prompt(prompt_text, seed, prefix, first_frame=first_frame,
+                                    ref_images=ref_images),
                "client_id": "yukkuri-story"}
     resp = post("/prompt", payload)
     pid = resp["prompt_id"]
@@ -129,6 +143,7 @@ def main():
     ap.add_argument("--out", default="output/momotaro")
     ap.add_argument("--scenes", default="", help="カンマ区切りで限定(例: 1,2)")
     ap.add_argument("--start-seed", type=int, default=1000)
+    ap.add_argument("--refs", default="", help="カンマ区切りの参照画像(ComfyUI/input 相対)。キャラシートを R2V で渡す")
     args = ap.parse_args()
 
     data = json.loads(Path(args.script).read_text(encoding="utf-8"))
@@ -140,6 +155,25 @@ def main():
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
     fails = []
+
+    # R2V 参照画像: ComfyUI/input にコピーしてファイル名リストへ
+    ref_images = None
+    if args.refs:
+        input_dir_ref = Path(r"C:\wk\samples\ComfyUI\input")
+        input_dir_ref.mkdir(parents=True, exist_ok=True)
+        ref_images = []
+        for rp in args.refs.split(","):
+            rp = Path(rp.strip())
+            if not rp.exists():
+                print(f"[refs] 参照画像が見つからずスキップ: {rp}", flush=True)
+                continue
+            dest = input_dir_ref / rp.name
+            shutil.copyfile(rp, dest)
+            ref_images.append(rp.name)
+        if ref_images:
+            print(f"[refs] R2V 参照画像: {ref_images}", flush=True)
+        else:
+            ref_images = None
 
     # シームレス連結: 台本の各シーンに "continue": true がある場合、
     # 前シーンの最終フレームを first_frame として渡す
@@ -181,7 +215,7 @@ def main():
                     else:
                         print(f"[{prefix}] 前シーンのフレーム抽出失敗、t2vで続行", flush=True)
             run_scene(s["prompt"], args.start_seed + s["id"] * 17, prefix, out_dir,
-                      first_frame=first_frame)
+                      first_frame=first_frame, ref_images=ref_images)
         except Exception as e:  # noqa: BLE001 — 1シーン失敗でも続行、最後に報告
             print(f"[{prefix}] FAILED: {e}", flush=True)
             fails.append((s["id"], str(e)))
