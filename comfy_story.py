@@ -39,7 +39,7 @@ def api_prompt(prompt_text: str, seed: int, prefix: str, first_frame: str | None
         "5": {"class_type": "LoraLoaderModelOnly", "inputs": {
             "lora_name": LORA, "strength_model": 1.0, "model": ["1", 0]}},
         "6": {"class_type": node_class, "inputs": {
-            "clip": ["2", 0], "vae": ["3", 0], "audio_vae": ["4", 0], "prompt": prompt_text,
+            "clip": ["2", 0], "vae": ["3", 0], "prompt": prompt_text,
             "width": WIDTH, "height": HEIGHT, "length": LENGTH}},
         "7": {"class_type": "RandomNoise", "inputs": {"noise_seed": seed, "control_after_generate": "fixed"}},
         "8": {"class_type": "KSamplerSelect", "inputs": {"sampler_name": "res_multistep"}},
@@ -60,6 +60,7 @@ def api_prompt(prompt_text: str, seed: int, prefix: str, first_frame: str | None
     if ref_images and not first_frame:
         # R2V ノードは first_frame 非対応。シームレス継続が優先のため、
         # first_frame がある場合は参照画像を捨てて ImageToVideo で継続する。
+        wf["6"]["inputs"]["audio_vae"] = ["4", 0]
         pairs = {}
         for i, img in enumerate(ref_images[:3]):
             wf[str(nid)] = {"class_type": "LoadImage", "inputs": {"image": img}}
