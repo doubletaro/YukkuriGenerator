@@ -57,8 +57,9 @@ def api_prompt(prompt_text: str, seed: int, prefix: str, first_frame: str | None
             "video": ["14", 0], "filename_prefix": f"momotaro/{prefix}", "format": "mp4"}},
     }
     nid = 16
-    if ref_images:
-        # 参照画像(キャラシート)は最大3枚まで
+    if ref_images and not first_frame:
+        # R2V ノードは first_frame 非対応。シームレス継続が優先のため、
+        # first_frame がある場合は参照画像を捨てて ImageToVideo で継続する。
         pairs = {}
         for i, img in enumerate(ref_images[:3]):
             wf[str(nid)] = {"class_type": "LoadImage", "inputs": {"image": img}}
