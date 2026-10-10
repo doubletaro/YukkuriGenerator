@@ -1,34 +1,36 @@
-Jack and the Beanstalk|Japanese-style Folktale Anime|Classic Story in 3 Minutes
+【AI昔話】ジャックと豆の木|昔ばなしアニメ|3分で観る世界名作
 
-Once upon a time, a poor boy named Jack traded his cow
-for a handful of magic beans.
+むかしむかし、貧しい少年ジャックは、
+飼い牛と引き換えに魔法の豆を手に入れました。
 
-Overnight, a giant beanstalk grew up to the sky.
-Jack climbed it and found a giant's castle,
-where a hen laid golden eggs and a harp played by itself.
+一夜にして空まで届く豆の木が育ち、
+ジャックは雲の上の巨人の城へ。金の卵を産む鶏と、
+自ら歌う黄金のハープを手に入れます。
 
-He fled with the treasures, the giant chasing behind,
-chopped down the beanstalk, and the giant fell.
-Jack and his mother lived happily ever after.
+追いかけてくる巨人を振り切り、豆の木を切って勝利。
+金の卵とハープのおかげで、ジャックとお母さんは
+豊かに暮らしました。
 
-The End.
+おしまい。
 
-About this channel:
-AI-generated folktale and classic story animations.
-Perfect for bedtime stories.
+No.009
 
-Chapters:
-0:00 The cow and the magic beans
-0:30 The beanstalk and the castle
-1:00 The hen, the harp, and the giant
-1:30 The escape and the happy ending
+■このチャンネルについて
+AIで生成した日本の昔話・世界の名作童話アニメを公開しています。
+生成パイプラインはオープンソース(Apache-2.0)で公開しています。詳細は概要欄またはリポジトリまで。
 
-#JackAndTheBeanstalk #Folktale #AIAnime #BedtimeStories #AIStory
+■あらすじ
+① 魔法の豆との交換
+② 豆の木と巨人の城
+③ 金の卵と黄金のハープ
+④ 巨人を振り切って勝利
+
+#ジャックと豆の木 #昔話 #世界名作童話 #AIアニメ #きょうの昔話 #開発者向け #AI昔話
 
 ━━━━━━━━━━━━━━━━━━
-Credits:
-- Video & audio: MiniMax H3 (ComfyUI / RTX 5060 Ti)
-- Character design: Qwen-Image
-- Script: GLM-5.3-Flash (local LLM)
+【制作】
+・映像・音声: MiniMax H3 (ComfyUI / RTX 5060 Ti)
+・キャラクターデザイン: Qwen-Image
+・台本構成: GLM-5.3-Flash-EXL3 (local LLM)
 ━━━━━━━━━━━━━━━━━━
-This video is AI-generated. Creative adaptations of the original tales are included.
+※本動画はAIによる自動生成コンテンツです。物語の表現には創作的な脚色を含みます。
