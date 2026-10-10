@@ -162,7 +162,7 @@ def main():
     # R2V 参照画像: ComfyUI/input にコピーしてファイル名リストへ
     ref_images = None
     if args.refs:
-        input_dir_ref = Path(r"C:\wk\samples\ComfyUI\input")
+        input_dir_ref = Path(r"C:\wk\ComfyUI\input")
         input_dir_ref.mkdir(parents=True, exist_ok=True)
         ref_images = []
         for rp in args.refs.split(","):
@@ -182,7 +182,7 @@ def main():
     # 前シーンの最終フレームを first_frame として渡す
     all_scenes = data["scenes"]
     id2scene = {s["id"]: s for s in all_scenes}
-    input_dir = Path(r"C:\wk\samples\ComfyUI\input")
+    input_dir = Path(r"C:\wk\ComfyUI\input")
 
     def last_frame_of(prev_scene_id: int) -> str | None:
         """前シーンmp4の最終フレームを ComfyUI/input へ抽出し、ファイル名を返す。"""
