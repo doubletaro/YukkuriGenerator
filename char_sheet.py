@@ -14,16 +14,17 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from yukkuri.folktale import verify_sheet  # noqa: E402
+from yukkuri.folktale import DEFAULT_STYLE_BASE, verify_sheet  # noqa: E402
 
 COMFY = "http://127.0.0.1:8188"
 UNET = "qwen_image_2.1_int8_convrot.safetensors"
 CLIP = "qwen3vl_8b_int8_convrot.safetensors"
 VAE = "qwen_image_2.1_vae_bf16.safetensors"
 SIGMAS = "1.0, 0.9375, 0.875, 0.75, 0.5, 0.25"  # viggle turbo 6step
-STYLE = ("1990年代の日本の劇場アニメ風セルアニメ、温かみのある色調。"
+STYLE = (f"{DEFAULT_STYLE_BASE}"
          "キャラクターデザインシート、1枚に同一キャラの三面図(正面・横向き・背面)を横一列に並べる。"
          "3体ともA-poseで自然に腕を下ろし直立、互いに重ならない、白背景、単独。")
+STYLE_SUFFIX = STYLE[len(DEFAULT_STYLE_BASE):]  # ベースより後ろの指示部分
 
 
 def api_prompt(prompt_text: str, seed: int, prefix: str, width=1024, height=1024) -> dict:
@@ -104,10 +105,15 @@ def main():
                     help="生成後の三面図ピクセル検証をスキップ")
     ap.add_argument("--style-note", default="",
                     help="作品固有の作風指示を STYLE に追記(90年代セル画ベースは不変)")
+    ap.add_argument("--style-base", default=None,
+                    help="スタイル基盤文(未指定は DEFAULT_STYLE_BASE)")
     args = ap.parse_args()
 
     out_dir = Path(args.out)
-    full = f"{STYLE} {args.style_note} {args.prompt}".strip()
+    base = args.style_base or DEFAULT_STYLE_BASE
+    if base and not base.endswith("。"):
+        base += "。"
+    full = f"{base}{STYLE_SUFFIX} {args.style_note} {args.prompt}".strip()
     failures = 0
     for i in range(args.count):
         payload = {"prompt": api_prompt(full, args.seed + i * 13, f"{args.name}_sheet_{i+1:02d}"),

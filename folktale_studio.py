@@ -85,6 +85,12 @@ def validate_config(cfg: dict) -> list[str]:
         errs.append("キャラが未設定")
     if cfg.get("style_note") and cfg.get("style_free"):
         errs.append("作風の「指定」と「自由」は併用できません")
+    for k in ("min_chars", "max_chars"):
+        v = cfg.get(k)
+        if v and (not isinstance(v, int) or not 100 <= v <= 3000):
+            errs.append(f"{k} は100〜3000の整数")
+    if cfg.get("min_chars") and cfg.get("max_chars") and cfg["min_chars"] >= cfg["max_chars"]:
+        errs.append("min_chars < max_chars にしてください")
     pub = cfg.get("publish") or {}
     if pub.get("privacy") not in (None, "private", "unlisted", "public"):
         errs.append("privacy が不正")
@@ -147,6 +153,7 @@ def run_stage(stage: str):
     if stage == "sheets":
         keys = merge_chars(slug, cfg)
         note = cfg.get("style_note") or ""
+        style_base = cfg.get("style_base") or None
         base_seed = int(cfg.get("sheet_seed", 7000))
         for i, k in enumerate(keys):
             cmd = [COMFY_PY, str(ROOT / "char_sheet.py"), "--out", str(out / "charsheets"),
@@ -154,6 +161,8 @@ def run_stage(stage: str):
                    "--prompt", _char_desc(cfg, k)]
             if note:
                 cmd += ["--style-note", note]
+            if style_base:
+                cmd += ["--style-base", style_base]
             _run_logged(cmd, log)
         with _state_lock:
             STATE["stages"][stage]["items"] = f"{_count_files(f'output/{slug}/charsheets/*.png')}枚"
@@ -168,6 +177,12 @@ def run_stage(stage: str):
                "--chars", slug, "--outline-file", str(_write_outline(cfg, out)),
                "--out", str(out), "--scenes", str(cfg.get("scenes") or len(cfg["outline"])),
                "--detail", cfg.get("detail", "detailed")] + style_args
+        if cfg.get("style_base"):
+            cmd += ["--style-base", cfg["style_base"]]
+        if cfg.get("min_chars"):
+            cmd += ["--min-chars", str(cfg["min_chars"])]
+        if cfg.get("max_chars"):
+            cmd += ["--max-chars", str(cfg["max_chars"])]
         _run_logged(cmd, log)
         n = len(json.loads((out / "script.json").read_text(encoding="utf-8"))["scenes"])
         with _state_lock:
@@ -243,6 +258,75 @@ def _run_logged(cmd: list[str], log: Path):
         raise RuntimeError(f"{cmd[1]} exit={r.returncode} ({log})")
 
 
+CREATE_SYSTEM = """あなたは昔ばなし動画の企画担当です。作品名から制作設定を下書きします。
+
+出力はJSONのみ(コードフェンス禁止)。形式:
+{"slug_suffix": "ローマ字の作品スラッグ(半角英数_のみ)",
+ "outline": ["15秒シーンのあらすじ1行", ... 合計12行],
+ "characters": [{"key": "半角英数", "name": "キャラ名", "desc": "外見の固定描写(服装・髪・持ち物を具体的に1〜2文)", "voice_style": 2}, ... 3〜5人],
+ "synopsis": ["概要欄のあらすじ①", "②", "③", "④"],
+ "intro": "説明文の導入1行(むかしむかし、...)",
+ "tags": "カンマ区切りのタグ"}
+
+ルール:
+- 作品名が日本の昔話なら定番の筋に従う。世界の名作や特殊な世界の作品ならその世界観に合わせる
+- descは動画モデル用の外見固定文として使う(画風の指定は含めない)
+- slug_suffix に番号は付けない(番号はシステムが付ける)"""
+
+
+def draft_config(title: str, cfg: dict) -> dict:
+    """作品名から未入力欄をLLMで下書きする(既に入力済みの欄は触らない)。"""
+    import requests
+
+    next_no = 1 + max([0] + [int(m.group(1)) for p in (ROOT / "output").glob("[0-9][0-9][0-9]_*")
+                              if (m := re.match(r"(\d{3})_", p.name))])
+    body = {"model": "GLM-5.3-Flash-EXL3", "temperature": 0.8, "max_tokens": 8000,
+            "chat_template_kwargs": {"thinking": False},
+            "messages": [{"role": "system", "content": CREATE_SYSTEM},
+                         {"role": "user", "content": f"作品名: {title}\n次の作品番号: {next_no:03d}\n"}]}
+    r = requests.post("http://192.168.1.21:8888/v1/chat/completions", json=body, timeout=1800)
+    r.raise_for_status()
+    content = r.json()["choices"][0]["message"].get("content") or ""
+    draft = _extract_json_obj(content)
+
+    out = dict(cfg)
+    out.setdefault("publish", {})
+    if not out.get("slug"):
+        out["slug"] = f"{next_no:03d}_{str(draft.get('slug_suffix') or '').strip().replace(' ', '_')}"
+        if not _slug_ok(out["slug"]):
+            out["slug"] = f"{next_no:03d}_work"
+    if not out.get("outline"):
+        out["outline"] = [s.strip() for s in draft.get("outline") or [] if s.strip()]
+        out["scenes"] = out.get("scenes") or len(out["outline"])
+    if not (out.get("custom_chars") or out.get("chars_key")):
+        out["custom_chars"] = [{"key": c.get("key", ""), "name": c.get("name", ""),
+                                "desc": c.get("desc", ""),
+                                "voice_style": int(c.get("voice_style", 2))}
+                               for c in draft.get("characters") or [] if c.get("key")]
+        out["scenes"] = out.get("scenes") or len(out.get("outline") or [])
+    if not (out.get("publish") or {}).get("synopsis"):
+        out["publish"]["synopsis"] = [s.strip() for s in draft.get("synopsis") or [] if s.strip()][:4]
+    if not out["publish"].get("intro"):
+        out["publish"]["intro"] = draft.get("intro", "")
+    if not out["publish"].get("tags"):
+        out["publish"]["tags"] = draft.get("tags", "")
+    if not out["publish"].get("youtube_title"):
+        out["publish"]["youtube_title"] = (f"【AI昔話】{title}|昔ばなしアニメ|"
+                                           f"3分で観る{'日本昔話' if out.get('detail') != 'free' else '名作童話'}")
+    return out
+
+
+def _extract_json_obj(raw: str) -> dict:
+    s = raw.strip()
+    m = re.search(r"```(?:json)?\s*(.*?)```", s, re.S)
+    if m:
+        s = m.group(1).strip()
+    start, end = s.find("{"), s.rfind("}")
+    if start == -1 or end <= start:
+        raise ValueError("JSONが見つかりません")
+    return json.loads(s[start:end + 1])
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args, **kwargs):  # アクセスログは抑制
         pass
@@ -274,7 +358,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, b"{}", "application/json")
 
     def do_POST(self):
-        if self.path in ("/api/config", "/api/run"):
+        if self.path in ("/api/config", "/api/create", "/api/run"):
             length = int(self.headers.get("Content-Length", 0))
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
@@ -295,6 +379,18 @@ class Handler(BaseHTTPRequestHandler):
                 STATE["config"] = cfg
                 STATE["config_path"] = str(path)
             self._send(200, json.dumps({"ok": True, "path": str(path)}).encode())
+        elif self.path == "/api/create":
+            cfg = body
+            title = (cfg.get("title") or "").strip()
+            if not title:
+                self._send(400, json.dumps({"errors": ["title が未入力です"]}).encode())
+                return
+            try:
+                filled = draft_config(title, cfg)
+            except Exception as e:
+                self._send(502, json.dumps({"errors": [f"下書き失敗: {str(e)[:200]}"]}).encode())
+                return
+            self._send(200, json.dumps({"config": filled}, ensure_ascii=False).encode())
         elif self.path == "/api/run":
             req = body
             stage = req.get("stage", "")

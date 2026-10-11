@@ -56,6 +56,10 @@
       <h2>作品設定</h2>
       <div class="row">
         <div><label>作品名(タイトルカード・連結)</label><input type="text" id="title" placeholder="つるの恩返し"></div>
+        <div style="max-width:150px"><label style="visibility:hidden">-</label>
+          <button type="button" id="create_btn" class="btn-save" style="margin-top:0;width:100%">Create</button></div>
+      </div>
+      <div class="row">
         <div><label>スラッグ(output/配下の名前)</label><input type="text" id="slug" placeholder="019_tsuru"></div>
       </div>
       <div class="row">
@@ -67,11 +71,17 @@
           </select>
         </div>
       </div>
+      <div class="row">
+        <div><label>シーンの最小文字数(空欄=詳細度の既定)</label><input type="number" id="min_chars" placeholder="550"></div>
+        <div><label>シーンの最大文字数(空欄=詳細度の既定)</label><input type="number" id="max_chars" placeholder="700"></div>
+      </div>
       <label>あらすじ(1行 = 1シーン)</label>
       <textarea id="outline" rows="7" placeholder="雪の山道で罠にかかった鶴を助ける&#10;雪の夜、娘が訪ねてくる&#10;..."></textarea>
 
-      <label>作風(90年代日本セル画は全作品共通)</label>
-      <div class="radio-line"><label style="display:inline"><input type="radio" name="stylemode" value="default" checked> 標準(水彩・温かみ)</label>
+      <label>作風ベース(90年代セル画・全作品共通。編集可)</label>
+      <input type="text" id="style_base" placeholder="1990年代の日本の劇場アニメ風セルアニメ、...">
+      <label>作風の追加指定(作品ごと。90年代セル画ベースは不変)</label>
+      <div class="radio-line"><label style="display:inline"><input type="radio" name="stylemode" value="default" checked> 標準(上のベースのみ)</label>
         <label style="display:inline;margin-left:14px"><input type="radio" name="stylemode" value="note"> 作品ごとに指定</label>
         <label style="display:inline;margin-left:14px"><input type="radio" name="stylemode" value="free"> LLMの想像力に任せる</label></div>
       <input type="text" id="style_note" placeholder="例: 砂漠の金と宝石の豪華絢爛な色調、幾何学文様の美術" disabled>
@@ -130,6 +140,7 @@
 <script>
 const $ = id => document.getElementById(id);
 const SYNOPSIS_N = 4;
+const DEFAULT_STYLE_BASE = "1990年代の日本の劇場アニメ風セルアニメ、水彩風の美術背景、温かみのある色調、16:9。";
 
 function charRow(c = {}) {
   const tr = document.createElement('tr');
@@ -166,6 +177,9 @@ function collectConfig() {
     title: $('title').value.trim(), slug: $('slug').value.trim(),
     scenes: parseInt($('scenes').value)||0,
     detail: $('detail').value,
+    min_chars: parseInt($('min_chars').value)||0,
+    max_chars: parseInt($('max_chars').value)||0,
+    style_base: $('style_base').value.trim() || null,
     outline: $('outline').value.split('\n').map(s=>s.trim()).filter(Boolean),
     style_note: styleMode()==='note' ? $('style_note').value.trim() : null,
     style_free: styleMode()==='free',
@@ -180,6 +194,8 @@ function collectConfig() {
 function applyConfig(c) {
   $('title').value = c.title||''; $('slug').value = c.slug||'';
   $('scenes').value = c.scenes||12; $('detail').value = c.detail||'detailed';
+  $('min_chars').value = c.min_chars||''; $('max_chars').value = c.max_chars||'';
+  $('style_base').value = c.style_base || DEFAULT_STYLE_BASE;
   $('outline').value = (c.outline||[]).join('\n');
   const mode = c.style_free ? 'free' : (c.style_note ? 'note' : 'default');
   setStyleMode(mode, c.style_note);
@@ -221,6 +237,21 @@ document.querySelectorAll('input[name=stylemode]').forEach(r => r.onchange = () 
   $('style_note').disabled = styleMode() !== 'note';
 });
 $('add_char').onclick = () => $('char_table').querySelector('tbody').appendChild(charRow());
+$('create_btn').onclick = async () => {
+  const title = $('title').value.trim();
+  if (!title) { $('msg').className = 'err'; $('msg').textContent = '作品名を入力してから Create を押してください'; return; }
+  $('create_btn').disabled = true; $('create_btn').textContent = '下書き中…';
+  try {
+    const {status, data} = await post('/api/create', collectConfig());
+    if (status === 200) {
+      applyConfig(data.config);
+      $('msg').className = 'ok'; $('msg').textContent = '未入力欄を下書きしました。内容を確認して「設定を保存」';
+    } else {
+      $('msg').className = 'err'; $('msg').textContent = (data.errors||[]).join('\n');
+    }
+  } catch(e) { $('msg').className='err'; $('msg').textContent='Create失敗: '+e; }
+  $('create_btn').disabled = false; $('create_btn').textContent = 'Create';
+};
 for (let i=0;i<SYNOPSIS_N;i++) {
   const inp = document.createElement('input'); inp.type='text'; inp.id='syn_'+i; inp.placeholder=['雪の山道で鶴を助ける','娘の訪れと布','破られた約束','空へ帰る'][i]||'';
   $('synopsis').appendChild(inp);
@@ -262,7 +293,7 @@ async function refresh() {
     }
   } catch(e) { /* サーバー未起動 */ }
 }
-refresh(); setChars(); setInterval(refresh, 3000);
+refresh(); setChars(); $('style_base').value = DEFAULT_STYLE_BASE; setInterval(refresh, 3000);
 </script>
 </body>
 </html>

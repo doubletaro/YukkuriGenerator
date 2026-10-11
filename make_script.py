@@ -107,6 +107,8 @@ def main():
                     help="detailed=550〜700字の高密度(008以降)/about=250〜350字の簡素(001〜004風)")
     ap.add_argument("--style", default=None,
                     help="作品固有の作風指示(90年代セル画ベースに追記)。--style-free と併用不可")
+    ap.add_argument("--style-base", default=None,
+                    help="スタイル基盤文(未指定は90年代セル画の標準。設定画面から編集可)")
     ap.add_argument("--style-free", action="store_true",
                     help="絵柄・雰囲気をLLMの想像力に委ねる(アラジン/金太郎/アリスなど)")
     ap.add_argument("--min-chars", type=int, default=0, help="未指定は detail に応じて自動")
@@ -125,7 +127,7 @@ def main():
 
     outline = load_outline(args.outline_file)
     n_scenes = args.scenes or len(outline)
-    style_sentence = build_style_sentence(args.style, args.style_free)
+    style_sentence = build_style_sentence(args.style, args.style_free, base=args.style_base)
     system = build_system_prompt(char_fixed_sentences(args.chars), outline,
                                  min_chars, max_chars,
                                  style_sentence=style_sentence, detail=args.detail)

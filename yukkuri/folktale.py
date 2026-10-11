@@ -14,34 +14,39 @@ import re
 from pathlib import Path
 from typing import Any
 
-# 毎回同一文で固定するスタイル宣言の基盤。90年代日本セル画は不変、
-# それ以外の作風(絵柄・色調・美術)は作品ごとに変えてよい(ユーザー方針)。
-BASE_STYLE = "1990年代の日本の劇場アニメ風セルアニメ、16:9。"
+# 毎回同一文で固定するスタイル宣言の基盤。90年代日本セル画は全作品共通だが、
+# 設定画面から編集可能(それ以外の作風は作品ごとに変えてよい — ユーザー方針)。
+DEFAULT_STYLE_BASE = ("1990年代の日本の劇場アニメ風セルアニメ、水彩風の美術背景、"
+                      "温かみのある色調、16:9。")
 NO_DISNEY = "ディズニーを含む欧米アニメのキャラクターデザインは使用しない。"
 
 # デフォルト(detailed)の固定文 — 001〜017と同じトーン
-STYLE_SENTENCE = ("1990年代の日本の劇場アニメ風セルアニメ、水彩風の美術背景、"
-                  "温かみのある色調、16:9。" + NO_DISNEY)
+STYLE_SENTENCE = DEFAULT_STYLE_BASE + NO_DISNEY
 
 # 作風をLLMの想像力に委ねる場合の固定文
-STYLE_FREE_SENTENCE = (BASE_STYLE + "絵柄・色調・美術の雰囲気は物語の世界に合わせて自分で決め、"
+STYLE_FREE_SENTENCE = (DEFAULT_STYLE_BASE + "絵柄・色調・美術の雰囲気は物語の世界に合わせて自分で決め、"
                        "決めた描写を全シーンの【スタイル】に同一文で書くこと。" + NO_DISNEY)
 
 
-def build_style_sentence(style_note: str | None = None, style_free: bool = False) -> str:
+def build_style_sentence(style_note: str | None = None, style_free: bool = False,
+                         base: str | None = None) -> str:
     """作品ごとのスタイル固定文を返す。
 
+    - base: 90年代セル画ベースの文(編集可。Noneなら DEFAULT_STYLE_BASE)
     - style_free=True: 絵柄・雰囲気はLLMが決める(アラジン/金太郎/アリスなど世界が特殊な作品向け)
     - style_note: 追加の作風指示(例: 「砂漠の金と宝石の豪華絢爛な色調」)
-    - どちらも無し: 従来の detailed 固定文
+    - どちらも無し: base + ディズニー禁止のみ
     """
     if style_free and style_note:
         raise ValueError("--style と --style-free は併用できません")
+    base = (base or DEFAULT_STYLE_BASE).strip()
+    if base and not base.endswith("。"):
+        base += "。"
     if style_free:
-        return STYLE_FREE_SENTENCE
+        return f"{base}絵柄・色調・美術の雰囲気は物語の世界に合わせて自分で決め、決めた描写を全シーンの【スタイル】に同一文で書くこと。{NO_DISNEY}"
     if style_note:
-        return f"{BASE_STYLE}{style_note.strip()}{NO_DISNEY}"
-    return STYLE_SENTENCE
+        return f"{base}{style_note.strip()}{NO_DISNEY}"
+    return f"{base}{NO_DISNEY}"
 
 
 REQUIRED_SECTIONS = ["【スタイル】", "【キャラ】", "【シーン】", "【音声】"]
