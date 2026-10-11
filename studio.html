@@ -64,16 +64,16 @@
       </div>
       <div class="row">
         <div><label>シーン数</label><input type="number" id="scenes" value="12" min="4" max="16"></div>
-        <div><label>指示の詳細度</label>
+        <div><label>指示の詳細度(選ぶと文字数を自動入力)</label>
           <select id="detail">
-            <option value="detailed">詳細(550〜700字/シーン) — 008以降と同じ</option>
-            <option value="about">アバウト(250〜350字/シーン) — 001〜004風</option>
+            <option value="detailed">詳細(008以降と同じ高密度)</option>
+            <option value="about">アバウト(001〜004風の簡素)</option>
           </select>
         </div>
       </div>
       <div class="row">
-        <div><label>シーンの最小文字数(空欄=詳細度の既定)</label><input type="number" id="min_chars" placeholder="550"></div>
-        <div><label>シーンの最大文字数(空欄=詳細度の既定)</label><input type="number" id="max_chars" placeholder="700"></div>
+        <div><label>シーンの最小文字数(数値で指定)</label><input type="number" id="min_chars" value="550" min="100" max="3000"></div>
+        <div><label>シーンの最大文字数(数値で指定)</label><input type="number" id="max_chars" value="700" min="100" max="3000"></div>
       </div>
       <label>あらすじ(1行 = 1シーン)</label>
       <textarea id="outline" rows="7" placeholder="雪の山道で罠にかかった鶴を助ける&#10;雪の夜、娘が訪ねてくる&#10;..."></textarea>
@@ -104,7 +104,8 @@
         <div><label>シート生成のシード</label><input type="number" id="sheet_seed" value="7000"></div>
         <div><label style="visibility:hidden">-</label><label class="radio-line" style="display:inline"><input type="checkbox" id="no_endcard"> エンドカードなし</label></div>
       </div>
-      <button class="btn-save" id="save">設定を保存</button>
+      <button class="btn-save" id="submit_btn">提出</button>
+      <button type="button" id="save" class="btn-save" style="background:#8a7f6e">保存のみ(実行しない)</button>
       <div id="msg"></div>
     </section>
 
@@ -194,7 +195,8 @@ function collectConfig() {
 function applyConfig(c) {
   $('title').value = c.title||''; $('slug').value = c.slug||'';
   $('scenes').value = c.scenes||12; $('detail').value = c.detail||'detailed';
-  $('min_chars').value = c.min_chars||''; $('max_chars').value = c.max_chars||'';
+  $('min_chars').value = c.min_chars || DETAIL_PRESETS[c.detail||'detailed'][0];
+  $('max_chars').value = c.max_chars || DETAIL_PRESETS[c.detail||'detailed'][1];
   $('style_base').value = c.style_base || DEFAULT_STYLE_BASE;
   $('outline').value = (c.outline||[]).join('\n');
   const mode = c.style_free ? 'free' : (c.style_note ? 'note' : 'default');
@@ -237,6 +239,28 @@ document.querySelectorAll('input[name=stylemode]').forEach(r => r.onchange = () 
   $('style_note').disabled = styleMode() !== 'note';
 });
 $('add_char').onclick = () => $('char_table').querySelector('tbody').appendChild(charRow());
+// 詳細度プリセット → 文字数欄へ自動入力(ユーザーは数値を直接編集できる)
+const DETAIL_PRESETS = {detailed: [550, 700], about: [250, 350]};
+function applyDetailPreset() {
+  const [lo, hi] = DETAIL_PRESETS[$('detail').value];
+  $('min_chars').value = lo; $('max_chars').value = hi;
+}
+$('detail').onchange = applyDetailPreset;
+// 提出: 設定を保存し、このチャットのエージェントへ通知(進捗はチャットで報告される)
+$('submit_btn').onclick = async () => {
+  const cfg = collectConfig();
+  const {status, data} = await post('/api/config', cfg);
+  $('msg').className = status===200 ? 'ok' : 'err';
+  $('msg').textContent = status===200 ? '提出しました。エージェントがパイプラインを実行します(進捗はチャットで報告)' : (data.errors||[]).join('\n');
+  if (status !== 200) return;
+  const prompt = `【スタジオ提出】作品「${cfg.title}」(slug: ${cfg.slug}) の設定が output/_studio/${cfg.slug}.json に保存されました。` +
+    `この設定でパイプライン(①キャラシート生成→②台本生成→③シーン生成→④連結)を順に実行し、各工程の進捗・完了時刻・件数をこのチャットで報告してください。`;
+  if (window.hermes && window.hermes.send) {
+    window.hermes.send(prompt);
+  } else {
+    $('msg').textContent += '\n(チャット外で開いているため自動通知できません。チャットで「スタジオ設定を実行して」と伝えてください)';
+  }
+};
 $('create_btn').onclick = async () => {
   const title = $('title').value.trim();
   if (!title) { $('msg').className = 'err'; $('msg').textContent = '作品名を入力してから Create を押してください'; return; }
