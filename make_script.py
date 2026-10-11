@@ -20,6 +20,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from yukkuri.folktale import (  # noqa: E402
     STYLE_SENTENCE,
+    build_style_sentence,
     build_system_prompt,
     build_user_prompt,
     extract_json,
@@ -102,18 +103,33 @@ def main():
     ap.add_argument("--outline-file", required=True, help="シーンあらすじ(行=シーン)")
     ap.add_argument("--out", required=True, help="出力ディレクトリ")
     ap.add_argument("--scenes", type=int, default=0, help="シーン数(未指定はoutline行数)")
-    ap.add_argument("--min-chars", type=int, default=550)
-    ap.add_argument("--max-chars", type=int, default=700)
+    ap.add_argument("--detail", choices=["detailed", "about"], default="detailed",
+                    help="detailed=550〜700字の高密度(008以降)/about=250〜350字の簡素(001〜004風)")
+    ap.add_argument("--style", default=None,
+                    help="作品固有の作風指示(90年代セル画ベースに追記)。--style-free と併用不可")
+    ap.add_argument("--style-free", action="store_true",
+                    help="絵柄・雰囲気をLLMの想像力に委ねる(アラジン/金太郎/アリスなど)")
+    ap.add_argument("--min-chars", type=int, default=0, help="未指定は detail に応じて自動")
+    ap.add_argument("--max-chars", type=int, default=0)
     ap.add_argument("--endpoint", default=DEFAULT_ENDPOINT)
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--retries", type=int, default=3)
     args = ap.parse_args()
 
+    if args.style and args.style_free:
+        raise SystemExit("--style と --style-free は併用できません")
+    if args.detail == "about":
+        min_chars, max_chars = args.min_chars or 250, args.max_chars or 350
+    else:
+        min_chars, max_chars = args.min_chars or 550, args.max_chars or 700
+
     outline = load_outline(args.outline_file)
     n_scenes = args.scenes or len(outline)
+    style_sentence = build_style_sentence(args.style, args.style_free)
     system = build_system_prompt(char_fixed_sentences(args.chars), outline,
-                                 args.min_chars, args.max_chars)
-    user = build_user_prompt(n_scenes, args.min_chars, args.max_chars)
+                                 min_chars, max_chars,
+                                 style_sentence=style_sentence, detail=args.detail)
+    user = build_user_prompt(n_scenes, min_chars, max_chars)
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -122,7 +138,7 @@ def main():
     (out / "req.json").write_text(json.dumps(req, ensure_ascii=False, indent=1), encoding="utf-8")
 
     script, errs = generate(args.endpoint, args.model, system, user,
-                            n_scenes, args.min_chars, args.max_chars, args.retries)
+                            n_scenes, min_chars, max_chars, args.retries)
     if errs:
         raise SystemExit("台本生成に失敗: " + "; ".join(errs[:8]))
 

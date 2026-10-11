@@ -102,10 +102,12 @@ def main():
     ap.add_argument("--seed", type=int, default=7000)
     ap.add_argument("--no-verify", action="store_true",
                     help="生成後の三面図ピクセル検証をスキップ")
+    ap.add_argument("--style-note", default="",
+                    help="作品固有の作風指示を STYLE に追記(90年代セル画ベースは不変)")
     args = ap.parse_args()
 
     out_dir = Path(args.out)
-    full = f"{STYLE} {args.prompt}"
+    full = f"{STYLE} {args.style_note} {args.prompt}".strip()
     failures = 0
     for i in range(args.count):
         payload = {"prompt": api_prompt(full, args.seed + i * 13, f"{args.name}_sheet_{i+1:02d}"),

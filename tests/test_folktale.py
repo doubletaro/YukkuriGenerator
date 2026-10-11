@@ -8,11 +8,45 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from yukkuri.folktale import (  # noqa: E402
+    ABOUT_SCENE_RULES,
+    SCENE_DETAIL_RULES,
+    STYLE_FREE_SENTENCE,
+    STYLE_SENTENCE,
+    build_style_sentence,
+    build_system_prompt,
     default_out,
     extract_json,
     validate_script,
     verify_sheet,
 )
+
+
+def test_build_style_sentence_variants():
+    assert build_style_sentence() == STYLE_SENTENCE
+    assert "水彩風" in STYLE_SENTENCE and STYLE_SENTENCE.startswith("1990年代の日本の劇場アニメ風セルアニメ")
+    free = build_style_sentence(style_free=True)
+    assert free == STYLE_FREE_SENTENCE
+    assert "自分で決め" in free
+    note = build_style_sentence(style_note="砂漠の金と宝石の豪華絢爛な色調。")
+    assert "1990年代の日本の劇場アニメ風セルアニメ" in note  # ベースは不変
+    assert "砂漠の金と宝石" in note
+    with pytest.raises(ValueError):
+        build_style_sentence(style_note="x", style_free=True)  # 併用禁止
+
+
+def test_build_system_prompt_about_mode():
+    sysp = build_system_prompt({"おじいさん": "白髭の老農夫。"}, ["あらすじ1", "あらすじ2"],
+                               250, 350, detail="about")
+    assert ABOUT_SCENE_RULES in sysp
+    assert SCENE_DETAIL_RULES not in sysp
+    assert "簡素な描写" in sysp and "250〜350字" in sysp
+    det = build_system_prompt({"おじいさん": "白髭の老農夫。"}, ["あ", "b"], 550, 700)
+    assert SCENE_DETAIL_RULES in det and "高密度描写" in det
+
+
+def test_build_system_prompt_style_override():
+    sysp = build_system_prompt({"x": "y。"}, ["あ", "い"], style_sentence="スタイルテスト。")
+    assert "「スタイルテスト。」を毎回同一文" in sysp
 
 
 def _scene(i: int, total: int = 600, cont: bool = False) -> dict:

@@ -14,13 +14,39 @@ import re
 from pathlib import Path
 from typing import Any
 
-# 毎回同一文で固定するスタイル宣言(これを変えると作品間で画風がブレる)
+# 毎回同一文で固定するスタイル宣言の基盤。90年代日本セル画は不変、
+# それ以外の作風(絵柄・色調・美術)は作品ごとに変えてよい(ユーザー方針)。
+BASE_STYLE = "1990年代の日本の劇場アニメ風セルアニメ、16:9。"
+NO_DISNEY = "ディズニーを含む欧米アニメのキャラクターデザインは使用しない。"
+
+# デフォルト(detailed)の固定文 — 001〜017と同じトーン
 STYLE_SENTENCE = ("1990年代の日本の劇場アニメ風セルアニメ、水彩風の美術背景、"
-                  "温かみのある色調、16:9。ディズニーを含む欧米アニメのキャラクターデザインは使用しない。")
+                  "温かみのある色調、16:9。" + NO_DISNEY)
+
+# 作風をLLMの想像力に委ねる場合の固定文
+STYLE_FREE_SENTENCE = (BASE_STYLE + "絵柄・色調・美術の雰囲気は物語の世界に合わせて自分で決め、"
+                       "決めた描写を全シーンの【スタイル】に同一文で書くこと。" + NO_DISNEY)
+
+
+def build_style_sentence(style_note: str | None = None, style_free: bool = False) -> str:
+    """作品ごとのスタイル固定文を返す。
+
+    - style_free=True: 絵柄・雰囲気はLLMが決める(アラジン/金太郎/アリスなど世界が特殊な作品向け)
+    - style_note: 追加の作風指示(例: 「砂漠の金と宝石の豪華絢爛な色調」)
+    - どちらも無し: 従来の detailed 固定文
+    """
+    if style_free and style_note:
+        raise ValueError("--style と --style-free は併用できません")
+    if style_free:
+        return STYLE_FREE_SENTENCE
+    if style_note:
+        return f"{BASE_STYLE}{style_note.strip()}{NO_DISNEY}"
+    return STYLE_SENTENCE
+
 
 REQUIRED_SECTIONS = ["【スタイル】", "【キャラ】", "【シーン】", "【音声】"]
 
-# 15秒で完結する1イベントの必須描写(5点)。昔ばなしモードの品質基準。
+# 詳細モードの必須描写(5点)。001〜004系の簡素モードは ABOUT_SCENE_RULES を使う。
 SCENE_DETAIL_RULES = """- 【シーン】: 15秒で完結する1イベントを、**以下すべて含めて具体的に描く**:
   1) キャラの感情と顔の変化(例: 「痛みに羽を震わせ」「瞳を潤ませて」「戸惑いを隠せず」)
   2) 具体的なカメラワーク(開始画→被写体→終了画の3点。例: 「雪の結晶のクローズアップから始まり、引いて山道の二人の全身、暮れ空の嶺で終わる」)
@@ -28,24 +54,44 @@ SCENE_DETAIL_RULES = """- 【シーン】: 15秒で完結する1イベントを�
   4) 手や体の動きの詳細(「震える指で」「そっと両手で包み」「緯糺を打つ細かい手つき」)
   5) 季節・天候・時間帯の空気感(雪の質、風、光の角度、呼吸の白さ)と環境音の層(雪の軋み、遠い風、機織りの音)"""
 
+# 簡素モード(001〜004のアバウト版)の必須描写(3点)
+ABOUT_SCENE_RULES = """- 【シーン】: 15秒で完結する1イベントを、簡素に描く:
+  1) キャラの感情と動き(1文)
+  2) カメラワーク(開始画と終了画の2点程度)
+  3) 背景と光の特徴(1文)"""
+
+DETAIL_RULES = {"detailed": SCENE_DETAIL_RULES, "about": ABOUT_SCENE_RULES}
+
 
 def build_system_prompt(chars: dict[str, str], outline: list[str],
-                        min_chars: int = 550, max_chars: int = 700) -> str:
-    """キャラ固定文+12シーン構成から system プロンプトを組み立てる。
+                        min_chars: int = 550, max_chars: int = 700,
+                        style_sentence: str | None = None,
+                        detail: str = "detailed") -> str:
+    """キャラ固定文+Nシーン構成から system プロンプトを組み立てる。
 
     chars: {キャラ名: 固定描写文}、outline: 各シーンの1行あらすじ。
+    detail: "detailed"(550〜700字の高密度) or "about"(250〜350字の簡素)。
+    style_sentence: None なら detailed 標準(STYLE_SENTENCE)。
     """
+    if style_sentence is None:
+        style_sentence = STYLE_SENTENCE
     char_block = "\n".join(f"{n}=「{d}」" for n, d in chars.items())
     outline_block = "\n".join(f"{i}: {line}" for i, line in enumerate(outline, 1))
+    if detail == "about":
+        rules = ABOUT_SCENE_RULES
+        density = f"各{min_chars}〜{max_chars}字の簡素な描写"
+    else:
+        rules = SCENE_DETAIL_RULES
+        density = f"各{min_chars}〜{max_chars}字の高密度描写"
     return f"""あなたはAI動画生成モデル用のシナリオライターです。MiniMax H3(15秒以内の動画+ネイティブ音声生成)用のプロンプトを書きます。
 
 出力はJSONのみ。前置き・後書き・コードフェンス禁止。形式: {{"scenes":[{{"id":N,"title":"...","duration":15,"prompt":"...","continue":true|false}}]}}
 
-promptの書き方(各{min_chars}〜{max_chars}字の高密度描写):
-- 冒頭【スタイル】: 「{STYLE_SENTENCE}」を毎回同一文
+promptの書き方({density}):
+- 冒頭【スタイル】: 「{style_sentence}」を毎回同一文
 - 【キャラ】: 登場者の外見を毎回同一文で固定。以下の記述をそのまま使う(全員登場時は複数並記):
 {char_block}
-{SCENE_DETAIL_RULES}
+{rules}
 - **continue:true のシーンは、前シーンの最後の1秒の構図を次シーンの開始と一致させる**
 - 【音声】: 女性ナレーション(物語語り口1〜2文)を必ず入れる。キャラのセリフは最大1文。効果音・BGMの指定も書く
 - 字幕・テロップ禁止。暴力的描写は抑える。
