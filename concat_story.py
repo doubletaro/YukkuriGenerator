@@ -9,7 +9,11 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from yukkuri.folktale import default_out  # noqa: E402
 
 FFMPEG = "ffmpeg"
 
@@ -20,22 +24,36 @@ def run(args: list[str], cwd: Path | None = None):
         raise RuntimeError(" ".join(args[:6]) + "\n" + r.stderr[-1500:])
 
 
+def probe_duration(p: Path) -> float:
+    """シーンの実際の尺を取得(15秒固定を仮定しない)。"""
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                        "-of", "csv=p=0", str(p)], capture_output=True, text=True)
+    try:
+        return float(r.stdout.strip())
+    except ValueError:
+        return 15.083333  # H3標準(362f@24fps)へのフォールバック
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("dir", help="scene_NN.mp4 のあるディレクトリ")
-    ap.add_argument("--out", default="output/momotaro_final.mp4")
-    ap.add_argument("--title", default="桃太郎")
+    ap.add_argument("--out", default=None,
+                    help="未指定なら output/<ディレクトリ名>_final.mp4")
+    ap.add_argument("--title", default=None,
+                    help="タイトルカードを付ける場合は必須(--keep-title-endcard では不要)")
     ap.add_argument("--title-sec", type=float, default=2.5)
     ap.add_argument("--endcard-sec", type=float, default=3.0)
     ap.add_argument("--keep-title-endcard", action="store_true",
                     help="タイトル/エンドカードを付けず連結のみ")
     ap.add_argument("--no-endcard", action="store_true", help="エンドカードを付けない")
-    ap.add_argument("--title-style", choices=["modern", "folktale"], default="modern",
-                    help="folktale=和紙+縦書き筆文字の日本昔話風")
+    ap.add_argument("--title-style", choices=["modern", "folktale"], default="folktale",
+                    help="folktale=和紙+縦書き筆文字の日本昔話風(デフォルト)")
     args = ap.parse_args()
 
     d = Path(args.dir).resolve()
-    out = Path(args.out).resolve()
+    out = Path(args.out).resolve() if args.out else default_out(d)
+    if not args.keep_title_endcard and not args.title:
+        raise SystemExit("--title を指定してください(タイトルなしで連結する場合は --keep-title-endcard)")
     scenes = sorted(p for p in d.glob("scene_*.mp4") if "_old" not in p.name)
     if not scenes:
         raise SystemExit("scene_*.mp4 が見つかりません")
@@ -51,7 +69,7 @@ def main():
     run([FFMPEG, "-y", "-v", "error", "-f", "concat", "-safe", "0", "-i", lst.name,
          "-c:v", "libx264", "-crf", "20", "-preset", "medium",
          "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-ac", "2", body.name], d)
-    dur = 15.083333 * len(scenes)
+    dur = sum(probe_duration(s) for s in scenes)
 
     # 2) タイトル/エンドカード
     if args.keep_title_endcard:
@@ -73,11 +91,8 @@ def main():
                 continue
         return ImageFont.load_default()
 
-    def make_folktale_title(name: str, title: str, sub: str | None):
-        """日本昔話風: 和紙ベージュ背景 + 縦書き筆文字 + 落款風の赤印。
-
-        タイトルの文字数に応じてフォントサイズを自動縮小し、見切れを防ぐ。
-        """
+    def _washi_base():
+        """和紙ベージュ背景+巻物風の枠(folktaleタイトル/エンドカード共通)。"""
         import random
         rng = random.Random(42)
         W, H = 640, 480
@@ -91,6 +106,16 @@ def main():
         # 巻物風の枠
         dd.rectangle([14, 14, W - 15, H - 15], outline=(90, 70, 50), width=4)
         dd.rectangle([22, 22, W - 23, H - 23], outline=(150, 125, 95), width=1)
+        return img
+
+    def make_folktale_title(name: str, title: str, sub: str | None):
+        """日本昔話風: 和紙ベージュ背景 + 縦書き筆文字 + 落款風の赤印。
+
+        タイトルの文字数に応じてフォントサイズを自動縮小し、見切れを防ぐ。
+        """
+        W, H = 640, 480
+        img = _washi_base()
+        dd = ImageDraw.Draw(img)
 
         ink = (43, 37, 35)
         sub_zone_h = (64 + 24) if sub else 30        # サブテキスト領域+余白
@@ -122,6 +147,18 @@ def main():
             dd.text(((W - (bb2[2] - bb2[0])) // 2, H - 64), sub, font=f_sub,
                     fill=(90, 70, 50))
         # 落款風の赤印
+        dd.rectangle([W - 96, H - 120, W - 56, H - 80], fill=(178, 34, 34))
+        img.save(d / name)
+
+    def make_folktale_endcard(name: str, text: str):
+        """日本昔話風エンドカード: 和紙背景+明朝横書き+赤印(タイトルと同一意匠)。"""
+        img = _washi_base()
+        dd = ImageDraw.Draw(img)
+        W, H = img.size
+        f = _font(30, serif=True)
+        bb = dd.textbbox((0, 0), text, font=f)
+        dd.text(((W - (bb[2] - bb[0])) // 2, (H - (bb[3] - bb[1])) // 2 - 10),
+                text, font=f, fill=(43, 37, 35))
         dd.rectangle([W - 96, H - 120, W - 56, H - 80], fill=(178, 34, 34))
         img.save(d / name)
 
@@ -159,7 +196,10 @@ def main():
     else:
         make_card("title.jpg", args.title, "YukkuriGenerator")
     if not args.no_endcard:
-        make_card("endcard.jpg", "ご視聴ありがとうございました", "YukkuriGenerator")
+        if args.title_style == "folktale":
+            make_folktale_endcard("endcard.jpg", "ご視聴ありがとうございました")
+        else:
+            make_card("endcard.jpg", "ご視聴ありがとうございました", "YukkuriGenerator")
 
     def card_video(name: str, img: str, sec: float):
         run([FFMPEG, "-y", "-v", "error", "-loop", "1", "-t", f"{sec:.3f}", "-i", img,

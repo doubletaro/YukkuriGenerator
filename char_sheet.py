@@ -8,9 +8,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 import time
 import urllib.request
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from yukkuri.folktale import verify_sheet  # noqa: E402
 
 COMFY = "http://127.0.0.1:8188"
 UNET = "qwen_image_2.1_int8_convrot.safetensors"
@@ -18,7 +22,8 @@ CLIP = "qwen3vl_8b_int8_convrot.safetensors"
 VAE = "qwen_image_2.1_vae_bf16.safetensors"
 SIGMAS = "1.0, 0.9375, 0.875, 0.75, 0.5, 0.25"  # viggle turbo 6step
 STYLE = ("1990年代の日本の劇場アニメ風セルアニメ、温かみのある色調。"
-         "キャラクターデザインシート、全身立ち絵、正面、白背景、単独。")
+         "キャラクターデザインシート、1枚に同一キャラの三面図(正面・横向き・背面)を横一列に並べる。"
+         "3体ともA-poseで自然に腕を下ろし直立、互いに重ならない、白背景、単独。")
 
 
 def api_prompt(prompt_text: str, seed: int, prefix: str, width=1024, height=1024) -> dict:
@@ -95,10 +100,13 @@ def main():
     ap.add_argument("--prompt", required=True)
     ap.add_argument("--count", type=int, default=3)
     ap.add_argument("--seed", type=int, default=7000)
+    ap.add_argument("--no-verify", action="store_true",
+                    help="生成後の三面図ピクセル検証をスキップ")
     args = ap.parse_args()
 
     out_dir = Path(args.out)
     full = f"{STYLE} {args.prompt}"
+    failures = 0
     for i in range(args.count):
         payload = {"prompt": api_prompt(full, args.seed + i * 13, f"{args.name}_sheet_{i+1:02d}"),
                    "client_id": "yukkuri-charsheet"}
@@ -108,6 +116,14 @@ def main():
         entry = wait_output(pid)
         files = fetch(entry, out_dir)
         print(f"[sheet {i+1}] saved: {files}", flush=True)
+        if not args.no_verify:
+            for f in files:
+                ok, detail = verify_sheet(f)
+                print(f"[verify] {f.name}: {'OK' if ok else 'FAIL - ' + detail}", flush=True)
+                if not ok:
+                    failures += 1
+    if failures:
+        raise SystemExit(f"検証不合格シート {failures} 枚。seed を変えて再生成してください。")
 
 
 if __name__ == "__main__":
