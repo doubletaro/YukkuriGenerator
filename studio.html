@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>昔ばなし制作スタジオ</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body { font-family: "Meiryo", "Yu Gothic", sans-serif; margin: 0; background: #f6f2ea; color: #33302b; }
+  header { background: #2b2523; color: #f0e8d8; padding: 14px 24px; display: flex; align-items: baseline; gap: 16px; }
+  header h1 { font-size: 20px; margin: 0; }
+  header .note { font-size: 12px; opacity: .7; }
+  main { max-width: 1080px; margin: 0 auto; padding: 20px; display: grid; grid-template-columns: 1fr 380px; gap: 20px; }
+  @media (max-width: 980px) { main { grid-template-columns: 1fr; } }
+  section.card { background: #fffdf8; border: 1px solid #d8cdb8; border-radius: 10px; padding: 18px; margin-bottom: 18px; }
+  h2 { font-size: 15px; margin: 0 0 12px; border-left: 4px solid #b23434; padding-left: 8px; }
+  label { display: block; font-size: 12px; color: #6b6357; margin: 10px 0 3px; }
+  input[type=text], input[type=number], select, textarea { width: 100%; padding: 7px 9px; border: 1px solid #c9bda6; border-radius: 6px; font-size: 13px; background: #fff; }
+  textarea { font-family: inherit; resize: vertical; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+  .chars table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .chars th, .chars td { border-bottom: 1px solid #e4dbc8; padding: 4px 4px; text-align: left; }
+  .chars input { padding: 4px 6px; }
+  button { cursor: pointer; border: none; border-radius: 6px; padding: 8px 14px; font-size: 13px; }
+  .btn-save { background: #2f6e3f; color: #fff; margin-top: 12px; }
+  .btn-run { background: #b23434; color: #fff; width: 100%; margin-top: 8px; }
+  .btn-run:disabled { background: #b8ac9c; cursor: not-allowed; }
+  .btn-del { background: none; color: #b23434; font-size: 16px; padding: 0 6px; }
+  .radio-line { font-size: 13px; margin: 4px 0; }
+  #msg { font-size: 12px; margin-top: 8px; white-space: pre-wrap; }
+  .ok { color: #2f6e3f; } .err { color: #b23434; }
+  /* 進捗 */
+  .stage { border: 1px solid #d8cdb8; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; background: #fff; }
+  .stage .head { display: flex; justify-content: space-between; align-items: center; }
+  .stage .name { font-weight: bold; font-size: 13px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+  .badge.pending { background: #e8e2d4; color: #6b6357; }
+  .badge.running { background: #b23434; color: #fff; }
+  .badge.done { background: #2f6e3f; color: #fff; }
+  .badge.error { background: #7a1f1f; color: #fff; }
+  .stage .meta { font-size: 11px; color: #6b6357; margin-top: 4px; }
+  .stage pre { font-size: 10.5px; background: #f4efe4; border-radius: 6px; padding: 6px 8px; max-height: 130px; overflow: auto; margin: 6px 0 0; white-space: pre-wrap; }
+  .progress { height: 6px; background: #e8e2d4; border-radius: 3px; margin-top: 6px; }
+  .progress > div { height: 100%; background: #2f6e3f; border-radius: 3px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>昔ばなし制作スタジオ</h1>
+  <span class="note">設定を保存 → 上から順に実行。進捗は自動更新(3秒)</span>
+</header>
+<main>
+  <div>
+    <section class="card">
+      <h2>作品設定</h2>
+      <div class="row">
+        <div><label>作品名(タイトルカード・連結)</label><input type="text" id="title" placeholder="つるの恩返し"></div>
+        <div><label>スラッグ(output/配下の名前)</label><input type="text" id="slug" placeholder="019_tsuru"></div>
+      </div>
+      <div class="row">
+        <div><label>シーン数</label><input type="number" id="scenes" value="12" min="4" max="16"></div>
+        <div><label>指示の詳細度</label>
+          <select id="detail">
+            <option value="detailed">詳細(550〜700字/シーン) — 008以降と同じ</option>
+            <option value="about">アバウト(250〜350字/シーン) — 001〜004風</option>
+          </select>
+        </div>
+      </div>
+      <label>あらすじ(1行 = 1シーン)</label>
+      <textarea id="outline" rows="7" placeholder="雪の山道で罠にかかった鶴を助ける&#10;雪の夜、娘が訪ねてくる&#10;..."></textarea>
+
+      <label>作風(90年代日本セル画は全作品共通)</label>
+      <div class="radio-line"><label style="display:inline"><input type="radio" name="stylemode" value="default" checked> 標準(水彩・温かみ)</label>
+        <label style="display:inline;margin-left:14px"><input type="radio" name="stylemode" value="note"> 作品ごとに指定</label>
+        <label style="display:inline;margin-left:14px"><input type="radio" name="stylemode" value="free"> LLMの想像力に任せる</label></div>
+      <input type="text" id="style_note" placeholder="例: 砂漠の金と宝石の豪華絢爛な色調、幾何学文様の美術" disabled>
+
+      <label>キャラ(既存を使う / 新規に入力)</label>
+      <div class="row">
+        <div><select id="chars_key"><option value="">-- 新規入力 --</option></select></div>
+        <div><label style="margin:0">シート生成対象(空欄区切りでキー指定、空なら全員)</label>
+          <input type="text" id="char_keys" placeholder="old_man old_woman tsuru"></div>
+      </div>
+      <div class="chars">
+        <table id="char_table">
+          <thead><tr><th style="width:110px">キー</th><th>名前</th><th>外見の説明(台本の固定文になる)</th><th style="width:52px">声</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button type="button" id="add_char" style="background:#e8e2d4;margin-top:6px">+ キャラ追加</button>
+      </div>
+
+      <div class="row" style="margin-top:8px">
+        <div><label>シート生成のシード</label><input type="number" id="sheet_seed" value="7000"></div>
+        <div><label style="visibility:hidden">-</label><label class="radio-line" style="display:inline"><input type="checkbox" id="no_endcard"> エンドカードなし</label></div>
+      </div>
+      <button class="btn-save" id="save">設定を保存</button>
+      <div id="msg"></div>
+    </section>
+
+    <section class="card">
+      <h2>公開設定(⑤の前に入力)</h2>
+      <div class="row">
+        <div><label>YouTubeタイトル</label><input type="text" id="yt_title"></div>
+        <div style="max-width:110px"><label>作品番号</label><input type="number" id="video_no" min="1"></div>
+      </div>
+      <div class="row">
+        <div><label>タグ(カンマ区切り)</label><input type="text" id="tags" value="昔話,AIアニメ,AI昔話"></div>
+        <div style="max-width:130px"><label>公開設定</label>
+          <select id="privacy"><option>public</option><option>unlisted</option><option>private</option></select></div>
+      </div>
+      <label>導入文(1行)</label><input type="text" id="intro" placeholder="むかしむかし、...">
+      <label>あらすじ①〜④(概要欄用)</label>
+      <div class="row" id="synopsis"></div>
+      <button class="btn-save" id="save_pub">公開設定を保存</button>
+    </section>
+  </div>
+
+  <div>
+    <section class="card" id="stage_panel">
+      <h2>進捗</h2><div id="stages"></div>
+    </section>
+    <section class="card">
+      <h2>保存済み設定</h2>
+      <select id="load_select"></select>
+      <button type="button" id="load_btn" style="background:#e8e2d4;margin-top:8px">読み込む</button>
+    </section>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const SYNOPSIS_N = 4;
+
+function charRow(c = {}) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td><input class="ck" value="${c.key||''}" placeholder="old_man"></td>
+    <td><input class="cn" value="${c.name||''}" placeholder="おじいさん"></td>
+    <td><input class="cd" value="${c.desc||''}" placeholder="白髭と深いしわ、藍色の着物..."></td>
+    <td><input class="cv" type="number" value="${c.voice_style??2}"></td>
+    <td><button class="btn-del" title="削除">×</button></td>`;
+  tr.querySelector('.btn-del').onclick = () => tr.remove();
+  return tr;
+}
+function getChars() {
+  return [...document.querySelectorAll('#char_table tbody tr')].map(tr => ({
+    key: tr.querySelector('.ck').value.trim(),
+    name: tr.querySelector('.cn').value.trim(),
+    desc: tr.querySelector('.cd').value.trim(),
+    voice_style: parseInt(tr.querySelector('.cv').value)||2,
+  })).filter(c => c.key && c.desc);
+}
+function setChars(chars) {
+  const tb = $('char_table').querySelector('tbody');
+  tb.innerHTML = '';
+  (chars||[]).forEach(c => tb.appendChild(charRow(c)));
+  if (!chars || !chars.length) tb.appendChild(charRow());
+}
+function styleMode() { return document.querySelector('input[name=stylemode]:checked').value; }
+function setStyleMode(v, note) {
+  document.querySelectorAll('input[name=stylemode]').forEach(r => r.checked = r.value === v);
+  $('style_note').disabled = v !== 'note';
+  if (note !== undefined) $('style_note').value = note || '';
+}
+function collectConfig() {
+  return {
+    title: $('title').value.trim(), slug: $('slug').value.trim(),
+    scenes: parseInt($('scenes').value)||0,
+    detail: $('detail').value,
+    outline: $('outline').value.split('\n').map(s=>s.trim()).filter(Boolean),
+    style_note: styleMode()==='note' ? $('style_note').value.trim() : null,
+    style_free: styleMode()==='free',
+    chars_key: $('chars_key').value || null,
+    char_keys: $('char_keys').value.trim().split(/\s+/).filter(Boolean),
+    custom_chars: getChars(),
+    sheet_seed: parseInt($('sheet_seed').value)||7000,
+    no_endcard: $('no_endcard').checked,
+    publish: currentPub(),
+  };
+}
+function applyConfig(c) {
+  $('title').value = c.title||''; $('slug').value = c.slug||'';
+  $('scenes').value = c.scenes||12; $('detail').value = c.detail||'detailed';
+  $('outline').value = (c.outline||[]).join('\n');
+  const mode = c.style_free ? 'free' : (c.style_note ? 'note' : 'default');
+  setStyleMode(mode, c.style_note);
+  $('chars_key').value = c.chars_key||''; $('char_keys').value = (c.char_keys||[]).join(' ');
+  setChars(c.custom_chars); $('sheet_seed').value = c.sheet_seed||7000;
+  $('no_endcard').checked = !!c.no_endcard;
+  const p = c.publish||{}; $('yt_title').value = p.youtube_title||''; $('video_no').value = p.video_no||'';
+  $('tags').value = p.tags||'昔話,AIアニメ,AI昔話'; $('privacy').value = p.privacy||'public';
+  $('intro').value = p.intro||'';
+  (p.synopsis||[]).forEach((s,i)=>{ const el=$('syn_'+i); if(el) el.value = s; });
+}
+function currentPub() {
+  return {
+    youtube_title: $('yt_title').value.trim(),
+    video_no: parseInt($('video_no').value)||0,
+    tags: $('tags').value.trim(), privacy: $('privacy').value,
+    intro: $('intro').value.trim(),
+    synopsis: [...Array(SYNOPSIS_N)].map((_,i)=>($('syn_'+i)?.value||'').trim()),
+  };
+}
+async function post(url, body) {
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  return {status: r.status, data: await r.json()};
+}
+$('save').onclick = async () => {
+  const {status, data} = await post('/api/config', collectConfig());
+  $('msg').className = status===200 ? 'ok' : 'err';
+  $('msg').textContent = status===200 ? '保存しました: '+data.path : (data.errors||[]).join('\n');
+  refresh();
+};
+$('save_pub').onclick = async () => {
+  const cfg = collectConfig(); cfg.publish = currentPub();
+  const {status, data} = await post('/api/config', cfg);
+  $('msg').className = status===200 ? 'ok' : 'err';
+  $('msg').textContent = status===200 ? '保存しました(公開設定含む)' : (data.errors||[]).join('\n');
+};
+$('style_note').disabled = true;
+document.querySelectorAll('input[name=stylemode]').forEach(r => r.onchange = () => {
+  $('style_note').disabled = styleMode() !== 'note';
+});
+$('add_char').onclick = () => $('char_table').querySelector('tbody').appendChild(charRow());
+for (let i=0;i<SYNOPSIS_N;i++) {
+  const inp = document.createElement('input'); inp.type='text'; inp.id='syn_'+i; inp.placeholder=['雪の山道で鶴を助ける','娘の訪れと布','破られた約束','空へ帰る'][i]||'';
+  $('synopsis').appendChild(inp);
+}
+$('load_btn').onclick = async () => {
+  const slug = $('load_select').value; if (!slug) return;
+  const r = await fetch('/api/config?slug=' + encodeURIComponent(slug));
+  if (!r.ok) { alert('読み込み失敗'); return; }
+  applyConfig(await r.json());
+  $('msg').className = 'ok'; $('msg').textContent = '読み込みました: ' + slug;
+};
+async function refresh() {
+  try {
+    const st = await (await fetch('/api/status')).json();
+    $('load_select').innerHTML = (st.existing_configs||[]).map(s=>`<option>${s}</option>`).join('');
+    // 選択中スラッグの保存済み設定を一度だけ取得してキャッシュ
+    const panel = $('stages');
+    panel.innerHTML = '';
+    for (const key of ['sheets','script','scenes','concat','publish']) {
+      const s = st.stages[key] || {};
+      const label = {sheets:'① キャラシート生成',script:'② 台本生成',scenes:'③ シーン生成',concat:'④ 連結',publish:'⑤ 公開'}[key];
+      const running = s.state==='running';
+      const div = document.createElement('div'); div.className='stage';
+      const prog = s.progress ? `<div class="meta">シーン: ${s.progress.done}/${s.progress.expected}</div>
+        <div class="progress"><div style="width:${s.progress.expected?100*s.progress.done/s.progress.expected:0}%"></div></div>` : '';
+      div.innerHTML = `<div class="head"><span class="name">${label}</span>
+          <span class="badge ${s.state||'pending'}">${({pending:'未実行',running:'実行中',done:'完了',error:'エラー'})[s.state||'pending']}</span></div>
+        <div class="meta">開始: ${s.start||'—'} | 終了: ${s.end||'—'} ${s.items? '| '+s.items : ''} ${s.error? '| '+s.error : ''}</div>${prog}
+        <pre>${s.log||''}</pre>`;
+      const btn = document.createElement('button'); btn.className='btn-run'; btn.textContent = running ? '実行中…' : '実行';
+      btn.disabled = running || !st.config;
+      btn.onclick = async () => {
+        const {status, data} = await post('/api/run', {stage: key});
+        if (status!==200) alert((data.errors||[]).join('\n'));
+        refresh();
+      };
+      div.appendChild(btn);
+      panel.appendChild(div);
+    }
+  } catch(e) { /* サーバー未起動 */ }
+}
+refresh(); setChars(); setInterval(refresh, 3000);
+</script>
+</body>
+</html>
