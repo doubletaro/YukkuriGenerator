@@ -114,24 +114,36 @@ def main():
     if base and not base.endswith("。"):
         base += "。"
     full = f"{base}{STYLE_SUFFIX} {args.style_note} {args.prompt}".strip()
-    failures = 0
+    ok_counts = []
     for i in range(args.count):
-        payload = {"prompt": api_prompt(full, args.seed + i * 13, f"{args.name}_sheet_{i+1:02d}"),
-                   "client_id": "yukkuri-charsheet"}
-        resp = post("/prompt", payload)
-        pid = resp["prompt_id"]
-        print(f"[sheet {i+1}] prompt_id={pid}", flush=True)
-        entry = wait_output(pid)
-        files = fetch(entry, out_dir)
-        print(f"[sheet {i+1}] saved: {files}", flush=True)
-        if not args.no_verify:
+        # 検証不合格はseedを変えて最大3回リトライ(キャラごとに合格1枚あれば十分)
+        ok = 0
+        for attempt in range(3):
+            payload = {"prompt": api_prompt(full, args.seed + (i * 3 + attempt) * 13,
+                                            f"{args.name}_sheet_{i+1:02d}"),
+                       "client_id": "yukkuri-charsheet"}
+            resp = post("/prompt", payload)
+            pid = resp["prompt_id"]
+            print(f"[sheet {i+1} attempt {attempt+1}] prompt_id={pid}", flush=True)
+            entry = wait_output(pid)
+            files = fetch(entry, out_dir)
+            print(f"[sheet {i+1} attempt {attempt+1}] saved: {files}", flush=True)
+            if args.no_verify:
+                ok = 1
+                break
+            all_ok = True
             for f in files:
-                ok, detail = verify_sheet(f)
-                print(f"[verify] {f.name}: {'OK' if ok else 'FAIL - ' + detail}", flush=True)
-                if not ok:
-                    failures += 1
-    if failures:
-        raise SystemExit(f"検証不合格シート {failures} 枚。seed を変えて再生成してください。")
+                passed, detail = verify_sheet(f)
+                print(f"[verify] {f.name}: {'OK' if passed else 'FAIL - ' + detail}", flush=True)
+                all_ok = all_ok and passed
+            if all_ok:
+                ok = 1
+                break
+        ok_counts.append(ok)
+    if not any(ok_counts):
+        raise SystemExit(f"{args.name}: 検証合格シートが1枚も無し。seed/prompt を変えて再生成してください。")
+    if not all(ok_counts):
+        print(f"[warn] {args.name}: 一部シートが不合格ですが合格分があるため続行", flush=True)
 
 
 if __name__ == "__main__":

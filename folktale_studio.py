@@ -20,6 +20,9 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from yukkuri.folktale import verify_sheet  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent
 STUDIO_DIR = ROOT / "output" / "_studio"
 LOG_DIR = STUDIO_DIR / "logs"
@@ -189,7 +192,14 @@ def run_stage(stage: str):
             STATE["stages"][stage]["items"] = f"{n}シーン"
         return
     if stage == "scenes":
-        refs = sorted((out / "charsheets").glob("*_sheet_01_*.png"))
+        # キャラごとに検証合格シートを優先して refs にする(無ければ先頭ファイル)
+        sheets_dir = out / "charsheets"
+        refs = []
+        if sheets_dir.exists():
+            for pre in sorted({f.name.rsplit("_sheet_", 1)[0] for f in sheets_dir.glob("*.png")}):
+                cands = sorted(sheets_dir.glob(f"{pre}_sheet_*.png"))
+                pick = next((c for c in cands if verify_sheet(c)[0]), cands[0])
+                refs.append(pick)
         cmd = [COMFY_PY, str(ROOT / "comfy_story.py"), str(out / "script.json"),
                "--out", str(out)]
         if refs:

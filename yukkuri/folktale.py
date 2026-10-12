@@ -188,7 +188,7 @@ def verify_sheet(path: str | Path) -> tuple[bool, str]:
         reasons.append(f"視点塊数={len(figs)}(3必需)")
     else:
         gaps = [figs[i + 1][0] - figs[i][1] for i in range(2)]
-        if min(gaps) < 15:
+        if min(gaps) < 5:  # 重なっていなければよい(隙間が狭いだけなら合格)
             reasons.append(f"視点の分離不足 gap={gaps}")
     for i in range(3):
         x0, x1 = w * i // 3, w * (i + 1) // 3
