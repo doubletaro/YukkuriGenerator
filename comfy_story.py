@@ -147,6 +147,9 @@ def main():
     ap.add_argument("--scenes", default="", help="カンマ区切りで限定(例: 1,2)")
     ap.add_argument("--start-seed", type=int, default=1000)
     ap.add_argument("--refs", default="", help="カンマ区切りの参照画像(ComfyUI/input 相対)。キャラシートを R2V で渡す")
+    ap.add_argument("--ref-names", default="",
+                    help="参照画像とキャラ名の対応(tanuki=タヌキ,usagi=ウサギ)。指定すると"
+                         "シーンの【キャラ】節に名前が現れるシートだけを渡す(混色防止)")
     args = ap.parse_args()
 
     data = json.loads(Path(args.script).read_text(encoding="utf-8"))
@@ -177,6 +180,13 @@ def main():
             print(f"[refs] R2V 参照画像: {ref_images}", flush=True)
         else:
             ref_images = None
+
+    # シート名→キャラ名の対応(シーンごとの絞り込み用)
+    ref_names: dict[str, str] = {}
+    for pair in args.ref_names.split(","):
+        if "=" in pair:
+            k, v = pair.split("=", 1)
+            ref_names[k.strip()] = v.strip()
 
     # シームレス連結: 台本の各シーンに "continue": true がある場合、
     # 前シーンの最終フレームを first_frame として渡す
@@ -217,8 +227,18 @@ def main():
                         print(f"[{prefix}] seamless: first_frame={ff}", flush=True)
                     else:
                         print(f"[{prefix}] 前シーンのフレーム抽出失敗、t2vで続行", flush=True)
+            scene_refs = ref_images
+            if ref_images and ref_names:
+                # 【キャラ】節に名前が現れるシートだけ渡す(全員渡すと混色する)
+                block = s["prompt"]
+                a, b = block.find("【キャラ】"), block.find("【シーン】")
+                char_block = block[a:b] if a != -1 and b > a else block
+                picked = [f for f in ref_images
+                          if any(n in char_block for k, n in ref_names.items() if f.startswith(k + "_"))]
+                scene_refs = picked[:3] if picked else ref_images[:3]
+                print(f"[{prefix}] refs: {scene_refs}", flush=True)
             run_scene(s["prompt"], args.start_seed + s["id"] * 17, prefix, out_dir,
-                      first_frame=first_frame, ref_images=ref_images)
+                      first_frame=first_frame, ref_images=scene_refs)
         except Exception as e:  # noqa: BLE001 — 1シーン失敗でも続行、最後に報告
             print(f"[{prefix}] FAILED: {e}", flush=True)
             fails.append((s["id"], str(e)))

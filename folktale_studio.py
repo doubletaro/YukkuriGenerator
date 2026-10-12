@@ -195,15 +195,30 @@ def run_stage(stage: str):
         # キャラごとに検証合格シートを優先して refs にする(無ければ先頭ファイル)
         sheets_dir = out / "charsheets"
         refs = []
+        ref_names = []
         if sheets_dir.exists():
+            # キー→名前の対応(custom_chars or char_specs)
+            key2name = {}
+            if cfg.get("custom_chars"):
+                key2name = {c["key"]: c["name"] for c in cfg["custom_chars"] if c.get("key")}
+            else:
+                try:
+                    entry = json.loads(SPEC_PATH.read_text(encoding="utf-8"))[cfg.get("chars_key") or slug]
+                    key2name = {k: c["name"] for k, c in entry["characters"].items()}
+                except Exception:
+                    pass
             for pre in sorted({f.name.rsplit("_sheet_", 1)[0] for f in sheets_dir.glob("*.png")}):
                 cands = sorted(sheets_dir.glob(f"{pre}_sheet_*.png"))
                 pick = next((c for c in cands if verify_sheet(c)[0]), cands[0])
                 refs.append(pick)
+                if pre in key2name:
+                    ref_names.append(f"{pre}={key2name[pre]}")
         cmd = [COMFY_PY, str(ROOT / "comfy_story.py"), str(out / "script.json"),
                "--out", str(out)]
         if refs:
             cmd += ["--refs", ",".join(str(p) for p in refs)]
+        if ref_names:
+            cmd += ["--ref-names", ",".join(ref_names)]
         _run_logged(cmd, log)
         with _state_lock:
             STATE["stages"][stage]["items"] = f"{_scene_progress(slug)['done']}/{_scene_progress(slug)['expected']}シーン"
