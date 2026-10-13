@@ -31,7 +31,9 @@ SPEC_PATH = Path("data/char_specs.json")
 DEFAULT_ENDPOINT = "http://192.168.1.21:8888/v1"
 DEFAULT_MODEL = "GLM-5.3-Flash-EXL3"
 # 思考OFFでも空になりうるため余裕を持つ。thinking時は思考分を含めて大きく取る
-MAX_TOKENS_NOTHINK = 16000
+import os
+
+MAX_TOKENS_NOTHINK = int(os.environ.get("YUKKURI_MAX_TOKENS", "16000"))
 MAX_TOKENS_THINK = 120000
 
 
