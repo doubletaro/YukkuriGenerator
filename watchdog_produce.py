@@ -21,6 +21,9 @@ import time
 import urllib.request
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from yukkuri.folktale import verify_sheet  # noqa: E402
+
 ROOT = Path(r"C:\wk\YukkuriGenerator")
 COMFY_PY = r"C:\wk\ComfyUI\venv\Scripts\python.exe"
 COMFY = "http://127.0.0.1:8188"
@@ -75,6 +78,7 @@ def scene_count(out: str) -> int:
 
 
 def run_logged(cmd: list[str], logname: str, timeout_min: int = 120) -> int:
+    cmd = [str(c) for c in cmd]
     with open(ROOT / f"output/_studio/logs/{logname}.log", "ab") as f:
         f.write(f"\n$ {' '.join(str(c) for c in cmd)}\n".encode())
         try:
@@ -178,8 +182,34 @@ def main():
             log(f"archived {n} scenes -> {dest}")
         elif kind == "script":
             do_script(ph["args"], ph["mark"], ph.get("env"))
+        elif kind == "write_refs":
+            # charsheetsから検証合格シートをピックし refs.json を書き出す
+            sheets_dir = Path(ph["sheets_dir"])
+            key2name = {}
+            try:
+                spec = json.loads((ROOT / "data" / "char_specs.json").read_text(encoding="utf-8"))
+                entry = spec[ph["chars_key"]]["characters"]
+                key2name = {k: c["name"] for k, c in entry.items()}
+            except Exception:
+                pass
+            refs, names = [], []
+            for pre in sorted({f.name.rsplit("_sheet_", 1)[0] for f in sheets_dir.glob("*.png")}):
+                cands = sorted(sheets_dir.glob(f"{pre}_sheet_*.png"))
+                pick = next((c for c in cands if verify_sheet(c)[0]), cands[0])
+                ok = verify_sheet(pick)[0]
+                refs.append(str(pick))
+                names.append(f"{pre}={key2name.get(pre, pre)}")
+                if not ok:
+                    log(f"write_refs: {pre} は合格シートが無いため候補を使用({cands[0].name})")
+            json.dump({"refs": refs, "ref_names": names},
+                      open(ph["out_file"], "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+            log(f"write_refs: {len(refs)} sheets -> {ph['out_file']}")
         elif kind == "scenes":
-            do_scenes(ph["out"], ph["refs"], ph["ref_names"], ph["expected"], ph["script"],
+            refs, ref_names = ph.get("refs"), ph.get("ref_names")
+            if ph.get("refs_file"):
+                rd = json.loads(Path(ph["refs_file"]).read_text(encoding="utf-8"))
+                refs, ref_names = rd["refs"], rd["ref_names"]
+            do_scenes(ph["out"], refs or [], ref_names or [], ph["expected"], ph["script"],
                       ph.get("deadline_min", 240))
         elif kind == "concat":
             cmd = [COMFY_PY, str(ROOT / "concat_story.py"), ph["out_dir"],
@@ -188,6 +218,7 @@ def main():
                 raise RuntimeError("concat failed")
             log(f"concat done: {ph['final']}")
         elif kind == "sheets":
+            ensure_comfy()
             for args in ph["cmds"]:
                 name = args[args.index("--name") + 1]
                 for attempt in range(2):

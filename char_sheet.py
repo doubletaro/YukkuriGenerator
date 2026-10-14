@@ -107,13 +107,16 @@ def main():
                     help="作品固有の作風指示を STYLE に追記(90年代セル画ベースは不変)")
     ap.add_argument("--style-base", default=None,
                     help="スタイル基盤文(未指定は DEFAULT_STYLE_BASE)")
+    ap.add_argument("--sheet-suffix", default=None,
+                    help="シート形式の指示文(未指定はキャラクターデザインシート三面図。実写は写真参照文を指定)")
     args = ap.parse_args()
 
     out_dir = Path(args.out)
     base = args.style_base or DEFAULT_STYLE_BASE
     if base and not base.endswith("。"):
         base += "。"
-    full = f"{base}{STYLE_SUFFIX} {args.style_note} {args.prompt}".strip()
+    suffix = args.sheet_suffix if args.sheet_suffix is not None else STYLE_SUFFIX
+    full = f"{base}{suffix} {args.style_note} {args.prompt}".strip()
     ok_counts = []
     for i in range(args.count):
         # 検証不合格はseedを変えて最大3回リトライ(キャラごとに合格1枚あれば十分)

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -56,9 +57,9 @@ def load_outline(path: str) -> list[str]:
 
 
 def call_llm(endpoint: str, model: str, system: str, user: str,
-             thinking: bool, timeout: int = 3600) -> tuple[str, str]:
+             thinking: bool, timeout: int = 3600, temperature: float = 0.8) -> tuple[str, str]:
     """(content, finish_reason) を返す。thinking モデル対応。"""
-    body = {"model": model, "temperature": 0.8, "max_tokens": MAX_TOKENS_THINK if thinking
+    body = {"model": model, "temperature": temperature, "max_tokens": MAX_TOKENS_THINK if thinking
             else MAX_TOKENS_NOTHINK, "messages": [{"role": "system", "content": system},
                                                   {"role": "user", "content": user}]}
     if not thinking:
@@ -70,25 +71,52 @@ def call_llm(endpoint: str, model: str, system: str, user: str,
     return (choice["message"].get("content") or "", choice.get("finish_reason") or "")
 
 
+def repair_json(s: str) -> str:
+    """LLMが壊しがちなJSONを修復する(id typo・裸の引用符)。"""
+    s = re.sub(r'"(id|duration)":(\d+)[a-z]', r'"\1":\2', s)
+    out, in_str, i = [], False, 0
+    while i < len(s):
+        c = s[i]
+        if c == '"' and not in_str:
+            in_str = True; out.append(c)
+        elif c == '"' and in_str:
+            j = i + 1
+            while j < len(s) and s[j] in ' \t\r\n': j += 1
+            if j < len(s) and s[j] in ',}]:':
+                in_str = False; out.append(c)
+            else:
+                out.append('\\"')
+        else:
+            out.append(c)
+        i += 1
+    return ''.join(out)
+
+
 def generate(endpoint: str, model: str, system: str, user: str,
              n_scenes: int, min_chars: int, max_chars: int, retries: int) -> tuple[dict, list[str]]:
     """検証合格まで再生成。戻り値は (script, 最終エラー一覧)。"""
     last_errs = ["未生成"]
     for attempt in range(1, retries + 1):
         thinking = attempt > retries - 1  # 最終試行のみ思考ONにフォールバック
-        label = "思考ON" if thinking else "思考OFF"
+        temp = round(0.8 + 0.1 * (attempt - 1), 2)  # 温度を変えて同一失敗を回避
+        label = f"思考{'ON' if thinking else 'OFF'} temp={temp}"
         print(f"[gen {attempt}/{retries}] {label} で生成中...", flush=True)
-        content, finish = call_llm(endpoint, model, system, user, thinking)
+        content, finish = call_llm(endpoint, model, system, user, thinking, temperature=temp)
         if not content:
             last_errs = [f"空応答(finish={finish})"]
             print(f"  -> 空応答(finish={finish})", flush=True)
             continue
+        data = None
         try:
-            data = extract_json(content)
+            data = json.loads(content, strict=False)  # prompt内のraw改行を許容
         except json.JSONDecodeError as e:
-            last_errs = [f"JSONパース失敗: {e}"]
-            print(f"  -> {last_errs[0]}", flush=True)
-            continue
+            print(f"  -> parse fail({e}) -> repair", flush=True)
+            try:
+                data = json.loads(repair_json(content), strict=False)
+            except json.JSONDecodeError as e2:
+                last_errs = [f"JSONパース失敗: {e2}"]
+                print(f"  -> {last_errs[0]}", flush=True)
+                continue
         errs = validate_script(data, n_scenes=n_scenes, min_chars=min_chars, max_chars=max_chars)
         if errs:
             last_errs = errs
